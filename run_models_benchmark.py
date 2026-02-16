@@ -1,15 +1,17 @@
 """
 Direct BenchmarkSuite runner for markdown-defined SNN checkpoints.
 
-This script implements the benchmark flow directly (similar to the example):
-    - BenchmarkSuite
-    - TensorControllerAdapter
-    - RateSNN state/action processors
-    - One run per controller (PI optional + all SNN models from markdown docs)
+Runs the BenchmarkSuite strictly sequentially: one model at a time, all
+scenarios for that model finish before the next model starts. Uses
+STANDARD_SCENARIOS by default; pass --quick for a shorter validation run.
+
+Speed: The SNN forward pass uses the selected device (CUDA if available).
+Most runtime is in the physics simulation (CPU). Using --device cuda helps
+when the model is on GPU; for faster iteration use --quick.
 
 Examples:
-    python embark-evaluation/run_models_benchmark.py --quick
     poetry run python embark-evaluation/run_models_benchmark.py
+    poetry run python embark-evaluation/run_models_benchmark.py --quick
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import time
 from pathlib import Path
 
 import torch
@@ -69,7 +72,14 @@ def parse_args() -> argparse.Namespace:
         "--plots-dir",
         type=str,
         default="embark-evaluation/models_for_evaluation/plots",
-        help="Directory where BenchmarkSuite JSON results are saved.",
+        help="Directory where JSON and report are saved (used when --run is not set).",
+    )
+    parser.add_argument(
+        "--run",
+        type=str,
+        default=None,
+        metavar="NAME",
+        help="Save results under models_for_evaluation/results/NAME (e.g. run1, run2). Overrides --plots-dir.",
     )
     parser.add_argument(
         "--quick",
@@ -81,17 +91,26 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         choices=["cpu", "cuda"],
-        help="Torch device to load SNN checkpoints on (default: auto).",
-    )
-    parser.add_argument(
-        "--skip-pi",
-        action="store_true",
-        help="Do not run PI baseline.",
+        help="Torch device for SNN checkpoints (default: cuda if available, else cpu).",
     )
     parser.add_argument(
         "--save-results",
         action="store_true",
-        help="Save one JSON file per controller summary.",
+        default=True,
+        help="Save JSON per controller and benchmark_report.txt (default: True).",
+    )
+    parser.add_argument(
+        "--no-save-results",
+        action="store_false",
+        dest="save_results",
+        help="Do not save JSON or report file.",
+    )
+    parser.add_argument(
+        "--only",
+        type=str,
+        default=None,
+        metavar="NAME[,NAME,...]",
+        help="Run only these controller names (e.g. v9_v9_no_tanh). Comma-separated. Default: all from markdown.",
     )
     parser.add_argument(
         "--dry-run",
@@ -133,6 +152,8 @@ class LocalSNNControllerWrapper:
 
     @torch.no_grad()
     def forward(self, observation: torch.Tensor):
+        device = next(self._model.parameters()).device
+        observation = observation.to(device)
         out = self._model(observation)
         if isinstance(out, tuple) and len(out) == 2:
             action_tensor, spike_rate = out
@@ -192,12 +213,8 @@ def _build_snn_controller(
         )
         action_processor = RateSNNActionProcessor(incremental=False)
 
-    try:
-        from embark.benchmark.controllers.neural import SNNControllerWrapper
-
-        wrapped = SNNControllerWrapper(model=model)
-    except Exception:
-        wrapped = LocalSNNControllerWrapper(model=model)
+    # Use our wrapper so observations are moved to the model device (fixes CPU/CUDA mismatch).
+    wrapped = LocalSNNControllerWrapper(model=model)
 
     controller = TensorControllerAdapter(
         controller=wrapped,
@@ -224,6 +241,13 @@ def main() -> int:
         print("Expected markdown lines like: **Checkpoint:** `evaluation/trained_models/v12/incremental/best_model.pt`")
         return 1
 
+    if args.only:
+        only_names = {s.strip() for s in args.only.split(",") if s.strip()}
+        model_paths = [p for p in model_paths if _controller_name_from_path(p) in only_names]
+        if not model_paths:
+            print(f"Error: --only {args.only!r} matched no models. Valid names: {[_controller_name_from_path(p) for p in collect_models_from_docs(docs_dir, repo_root)]}")
+            return 1
+
     missing = [p for p in model_paths if not p.exists()]
     if missing:
         print("Error: some checkpoint paths from markdown do not exist:")
@@ -232,17 +256,23 @@ def main() -> int:
         print("\nUpdate the markdown checkpoint paths or add the missing model files, then retry.")
         return 1
 
-    results_dir = (repo_root / args.plots_dir).resolve()
+    if args.run is not None:
+        results_dir = (repo_root / "embark-evaluation/models_for_evaluation/results" / args.run).resolve()
+    else:
+        results_dir = (repo_root / args.plots_dir).resolve()
 
     print("Discovered checkpoint models:")
     for idx, model_path in enumerate(model_paths, start=1):
         print(f"  {idx}. {model_path}")
 
     mode = "QUICK_SCENARIOS" if args.quick else "STANDARD_SCENARIOS"
-    device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
+    cuda_available = torch.cuda.is_available()
+    device = args.device or ("cuda" if cuda_available else "cpu")
     print(f"\nMode: {mode}")
-    print(f"Device: {device}")
-    print(f"PI baseline: {'disabled' if args.skip_pi else 'enabled'}")
+    print(f"PyTorch CUDA available: {cuda_available}")
+    if not cuda_available and args.device != "cpu":
+        print("  (Install PyTorch with CUDA: https://pytorch.org — choose CUDA version.)")
+    print(f"Device: {device}", flush=True)
 
     if args.dry_run:
         print("\nDry run complete. No benchmark executed.")
@@ -252,8 +282,6 @@ def main() -> int:
     try:
         from embark.benchmark import (
             BenchmarkSuite,
-            PIControllerAgent,
-            PMSMConfig,
             QUICK_SCENARIOS,
             STANDARD_SCENARIOS,
         )
@@ -265,45 +293,59 @@ def main() -> int:
     suite = BenchmarkSuite(scenarios=scenarios, verbose=True)
 
     results_dir.mkdir(parents=True, exist_ok=True)
-    print("\nRunning direct BenchmarkSuite evaluation...\n")
+    print("\nRunning BenchmarkSuite sequentially (one model at a time, all scenarios per model).\n", flush=True)
 
-    if not args.skip_pi:
-        print(">>> Running PI baseline")
-        pi = PIControllerAgent.from_system_config(PMSMConfig())
-        pi_summary = suite.run(controller=pi, name="PI-baseline")
-        suite.print_summary(pi_summary)
-        if args.save_results:
-            pi_path = results_dir / "PI-baseline.json"
-            suite.save_results(pi_summary, pi_path)
-            print(f"Saved: {pi_path}")
-        print()
+    report_lines: list[str] = []
+    if args.save_results:
+        report_lines.append(f"Benchmark report — Mode: {mode}, Device: {device}")
+        report_lines.append(f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        report_lines.append("")
 
-    for model_path in model_paths:
+    for idx, model_path in enumerate(model_paths, start=1):
         controller_name = _controller_name_from_path(model_path)
-        print(f">>> Running SNN model: {controller_name}")
+        print(f"[{idx}/{len(model_paths)}] >>> SNN model: {controller_name}", flush=True)
         try:
             controller, meta = _build_snn_controller(model_path, device=device)
         except Exception as exc:
-            print(f"  [ERROR] Could not build controller for {model_path.name}: {exc}")
+            print(f"  [ERROR] Could not build controller for {model_path.name}: {exc}", flush=True)
             continue
 
-        print(
-            "  "
-            f"version={meta.get('version')}, "
+        meta_str = (
+            f"  version={meta.get('version')}, "
             f"input={meta.get('input_size')}, "
             f"incremental={meta.get('incremental_output', False)}, "
             f"rate_steps={meta.get('rate_steps')}"
         )
+        print(meta_str, flush=True)
         try:
+            t0 = time.perf_counter()
             summary = suite.run(controller=controller, name=controller_name)
-            suite.print_summary(summary)
+            elapsed = time.perf_counter() - t0
+            print(suite.format_summary(summary))
+            print(f"  Running time: {elapsed:.2f} s", flush=True)
             if args.save_results:
+                report_lines.append(f">>> Running SNN model: {controller_name}")
+                report_lines.append(meta_str)
+                report_lines.append(suite.format_summary(summary))
+                report_lines.append(f"  Running time: {elapsed:.2f} s")
+                report_lines.append("")
                 output_path = results_dir / f"{controller_name}.json"
                 suite.save_results(summary, output_path)
-                print(f"Saved: {output_path}")
+                print(f"  Saved: {output_path}", flush=True)
+            print(f"  Done: {controller_name}\n", flush=True)
         except Exception as exc:
-            print(f"  [ERROR] Benchmark failed for {controller_name}: {exc}")
-        print()
+            print(f"  [ERROR] Benchmark failed for {controller_name}: {exc}", flush=True)
+            if args.save_results:
+                report_lines.append(f">>> Running SNN model: {controller_name}")
+                report_lines.append(meta_str)
+                report_lines.append(f"  [ERROR] Benchmark failed: {exc}")
+                report_lines.append("")
+            print(f"  Skipped: {controller_name}\n", flush=True)
+
+    if args.save_results and report_lines:
+        report_path = results_dir / "benchmark_report.txt"
+        report_path.write_text("\n".join(report_lines), encoding="utf-8")
+        print(f"Report saved: {report_path}")
 
     return 0
 
