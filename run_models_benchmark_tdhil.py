@@ -62,13 +62,13 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         metavar="NAME",
-        help="Save under embark-evaluation/models_for_evaluation/results/NAME",
+        help="Save under embark-evaluation/benchmarking-results/NAME",
     )
     parser.add_argument(
         "--plots-dir",
         type=str,
-        default="embark-evaluation/results/akida",
-        help="Results directory when --run is not set (default: embark-evaluation/results/akida)",
+        default="embark-evaluation/benchmarking-results/akida",
+        help="Results directory when --run is not set (default: embark-evaluation/benchmarking-results/akida)",
     )
     parser.add_argument(
         "--no-pwm",
@@ -157,7 +157,7 @@ def main() -> int:
     repo_root = script_path.parents[1]
     if args.run is not None:
         results_dir = (
-            repo_root / "embark-evaluation/models_for_evaluation/results" / args.run
+            repo_root / "embark-evaluation/benchmarking-results" / args.run
         ).resolve()
     else:
         results_dir = (repo_root / args.plots_dir).resolve()
