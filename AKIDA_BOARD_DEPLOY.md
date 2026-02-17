@@ -4,6 +4,8 @@ Use these steps to copy the inference script and your Akida model (`.fbz`) to th
 
 **Prerequisites:** Akida board powered and reachable (e.g. Wi‑Fi `akida-devkit-*`, password `Demo123Demo123`). Default IP used below: `10.42.0.1`. User: `bcdev`, password: `Demo123`.
 
+**Building the .fbz:** You don’t run anything on the board to “deploy” the model. The `.fbz` is built once (e.g. with `evaluation/akida/core/deploy.py` on a PC that has TensorFlow/quantizeml/cnn2snn). You only copy the built `.fbz` and the inference server to the board.
+
 ---
 
 ## 1. On the Akida board (SSH)
@@ -25,7 +27,7 @@ Leave this terminal open; you’ll start the server here in step 3.
 
 ---
 
-## 2. On your PC – copy inference script and .fbz
+## 2. On your PC – copy inference server and .fbz to the board
 
 From the **project root** in a **new** terminal (not inside SSH):
 
@@ -33,7 +35,7 @@ From the **project root** in a **new** terminal (not inside SSH):
 ```powershell
 cd C:\Users\Jonas\projects\thesis-nueromophic-controller-benchmark
 
-# Inference server (same script used by evaluation/akida)
+# Inference server
 scp evaluation/akida/server/inference_server.py bcdev@10.42.0.1:~/akida_deployment/server/
 
 # Your .fbz model (adjust path to your model)
@@ -45,10 +47,16 @@ scp evaluation/trained_models/v4/learned_linear/akida/akida_model.fbz bcdev@10.4
 cd /path/to/thesis-nueromophic-controller-benchmark
 
 scp evaluation/akida/server/inference_server.py bcdev@10.42.0.1:~/akida_deployment/server/
-scp evaluation/trained_models/v4/learned_linear/akida/akida_model.fbz bcdev@10.42.0.1:~/akida_deployment/models/
+scp path/to/akida_model.fbz bcdev@10.42.0.1:~/akida_deployment/models/
 ```
 
-If your `.fbz` lives elsewhere (e.g. `evaluation/trained_models/v3_new/akida/akida_model.fbz`), change the last path accordingly.
+If your `.fbz` lives elsewhere, change the path accordingly.
+
+**Optional – inspect script (only if you want to check hardware backend / SDK statistics on the board):**
+```bash
+scp evaluation/akida/scripts/inspect_akida_statistics.py bcdev@10.42.0.1:~/akida_deployment/
+# Then on the board: cd ~/akida_deployment && python3 inspect_akida_statistics.py models/akida_model.fbz
+```
 
 ---
 

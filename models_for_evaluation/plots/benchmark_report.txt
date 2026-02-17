@@ -1,23 +1,19 @@
-Benchmark report — Mode: STANDARD_SCENARIOS, Device: cuda
-Generated: 2026-02-16 21:30:26
+TD-HIL Benchmark report — Mode: QUICK_SCENARIOS
+Host: 10.42.0.1:5000
+Generated: 2026-02-17 00:46:40
 
->>> Running SNN model: v9_v9_no_tanh
-  version=v9, input=12, incremental=False, rate_steps=48
+>>> Controller: akida_tdhil
 
 ================================================================================
-  Benchmark Summary: v9_v9_no_tanh
-  6 scenarios completed, 0 safety violations
+  Benchmark Summary: akida_tdhil
+  2 scenarios completed, 0 safety violations
 ================================================================================
 
 Scenario                  RMS_iq  MaxErr_iq  Settle[s]   Status
 --------------------------------------------------------------------------------
-step_low_speed_500rpm_2A    1.8918     3.8561        N/A       OK
-step_mid_speed_1500rpm_2A    2.4639     3.7778        N/A       OK
-step_high_speed_2500rpm_2A    2.9275     3.9748        N/A       OK
-multi_step_bidirectional_1500rpm    2.7667     6.9372        N/A       OK
-four_quadrant_transition_1500rpm    2.8277     6.9954        N/A       OK
-field_weakening_2500rpm    2.9454     4.0102        N/A       OK
+step_mid_speed_1500rpm_2A    0.6824     2.1865        N/A       OK
+multi_step_bidirectional_1500rpm    1.1493     4.7845        N/A       OK
 --------------------------------------------------------------------------------
-AGGREGATE                            6.9954                    
+AGGREGATE                            4.7845                    
 
-  Running time: 2211.98 s
+  Running time: 71.36 s

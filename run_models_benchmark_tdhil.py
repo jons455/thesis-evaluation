@@ -67,8 +67,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--plots-dir",
         type=str,
-        default="embark-evaluation/models_for_evaluation/plots",
-        help="Results directory when --run is not set",
+        default="embark-evaluation/results/akida",
+        help="Results directory when --run is not set (default: embark-evaluation/results/akida)",
     )
     parser.add_argument(
         "--no-pwm",
