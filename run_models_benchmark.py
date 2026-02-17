@@ -21,6 +21,7 @@ import re
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 import torch
 
@@ -150,15 +151,71 @@ class LocalSNNControllerWrapper:
     def configure(self, *_args, **_kwargs) -> None:
         return None
 
+    def _build_neuromorphic_info_from_rate(
+        self, spike_rate: float | torch.Tensor | int
+    ) -> dict[str, float]:
+        """Estimate benchmark neuromorphic metrics from scalar spike-rate output."""
+        if isinstance(spike_rate, torch.Tensor):
+            spike_rate_value = float(spike_rate.detach().float().mean().item())
+        else:
+            spike_rate_value = float(spike_rate)
+
+        # Keep expected range stable even if model returns noisy values.
+        spike_rate_value = max(0.0, min(1.0, spike_rate_value))
+
+        fcs = list(getattr(self._model, "fcs", []))
+        rate_steps = int(getattr(self._model, "rate_steps", 1))
+        num_hidden_neurons = int(sum(int(fc.out_features) for fc in fcs))
+        total_spikes = int(round(spike_rate_value * num_hidden_neurons * rate_steps))
+
+        # Simple SyOps approximation: each spike triggers weighted fan-out work.
+        fanouts: list[int] = [int(fc.out_features) for fc in fcs[1:]]
+        readout = getattr(self._model, "readout", None)
+        if readout is not None and hasattr(readout, "out_features"):
+            fanouts.append(int(readout.out_features))
+        mean_fanout = float(sum(fanouts)) / float(len(fanouts)) if fanouts else 1.0
+        syops = int(round(total_spikes * mean_fanout))
+
+        return {
+            "mean_spike_rate": spike_rate_value,
+            "total_spikes": float(total_spikes),
+            "syops": float(syops),
+            "sparsity": float(1.0 - spike_rate_value),
+        }
+
+    def _normalize_info_dict(self, info: dict[str, Any]) -> dict[str, float]:
+        """Normalize various model-specific keys to benchmark accumulator keys."""
+        normalized: dict[str, float] = {}
+
+        if "total_spikes" in info:
+            normalized["total_spikes"] = float(info["total_spikes"])
+        if "syops" in info:
+            normalized["syops"] = float(info["syops"])
+        elif "total_operations" in info:
+            normalized["syops"] = float(info["total_operations"])
+        if "sparsity" in info:
+            normalized["sparsity"] = float(info["sparsity"])
+        elif "overall_sparsity" in info:
+            normalized["sparsity"] = float(info["overall_sparsity"])
+        if "mean_spike_rate" in info:
+            normalized["mean_spike_rate"] = float(info["mean_spike_rate"])
+
+        return normalized
+
     @torch.no_grad()
     def forward(self, observation: torch.Tensor):
         device = next(self._model.parameters()).device
         observation = observation.to(device)
         out = self._model(observation)
-        if isinstance(out, tuple) and len(out) == 2:
-            action_tensor, spike_rate = out
-            self._last_info = {"mean_spike_rate": float(spike_rate)}
+        if isinstance(out, tuple) and len(out) >= 2:
+            action_tensor = out[0]
+            info_like = out[1]
+            if isinstance(info_like, dict):
+                self._last_info = self._normalize_info_dict(info_like)
+            else:
+                self._last_info = self._build_neuromorphic_info_from_rate(info_like)
             return action_tensor
+        self._last_info = {}
         return out
 
 
