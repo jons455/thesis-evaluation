@@ -8,8 +8,8 @@ Pass/fail: ranking order matches Phase 0 ground truth per scenario.
 Float32 precision floor applies; sub-1e-4 A MAE differences are not meaningful.
 
 Usage:
-    poetry run python -m embark-evaluation.evaluation.phase3_discriminative
-    poetry run python -m embark-evaluation.evaluation.phase3_discriminative --run pvp_run1
+    poetry run python embark-evaluation/pvp/phase3_discriminative.py
+    poetry run python embark-evaluation/pvp/phase3_discriminative.py --run pvp_run1
 """
 
 from __future__ import annotations
@@ -37,6 +37,68 @@ from pvp.utils.common import (
 )
 
 
+def _run_with_trajectories(controller, scenarios, pmsm_config, controller_name):
+    """
+    Run controller through scenarios, capturing both metrics and trajectories.
+
+    Returns (per_scenario_metrics, per_scenario_trajectories).
+    """
+    from embark.benchmark.harness import ClosedLoopHarness
+    from embark.benchmark.metrics.neurobench_factory import create_metrics
+
+    all_metrics = {}
+    all_trajectories = {}
+
+    for scenario in scenarios:
+        task = scenario.create_task(physics_config=pmsm_config)
+        metrics = create_metrics(controller)
+
+        if hasattr(controller, "configure"):
+            controller.configure(task.physics_engine.config, task)
+
+        state, reference = task.reset()
+        controller.reset()
+        for m in metrics:
+            m.reset()
+
+        traj = {"t": [], "i_q_ref": [], "i_q": [], "i_d_ref": [], "i_d": [], "u_q": [], "u_d": []}
+        step = 0
+        done = False
+        dt = task.physics_engine.config.tau
+
+        while not done and step < (scenario.max_steps or float("inf")):
+            action = controller(state, reference)
+            controller_info = getattr(controller, "last_info", None)
+            next_state, next_ref, done = task.step(action)
+
+            for m in metrics:
+                m.update(state, reference, action, next_state, controller_info)
+
+            traj["t"].append(step * dt)
+            traj["i_q_ref"].append(float(reference["i_q_ref"]))
+            traj["i_q"].append(float(next_state["i_q"]))
+            traj["i_d_ref"].append(float(reference["i_d_ref"]))
+            traj["i_d"].append(float(next_state["i_d"]))
+            traj["u_q"].append(float(action["v_q"]))
+            traj["u_d"].append(float(action["v_d"]))
+
+            state, reference = next_state, next_ref
+            step += 1
+
+        metric_results: dict[str, Any] = {"steps": step}
+        for m in metrics:
+            result = m.compute()
+            if isinstance(result, dict):
+                metric_results.update(result)
+            else:
+                metric_results[m.name] = result
+
+        all_metrics[scenario.name] = metric_results
+        all_trajectories[scenario.name] = traj
+
+    return all_metrics, all_trajectories
+
+
 def run_phase3(
     run_name: str | None = None,
     seed: int = 42,
@@ -50,9 +112,12 @@ def run_phase3(
         STANDARD_SCENARIOS,
         BenchmarkSuite,
     )
+    from embark.benchmark.agents import PIControllerAgent
+    from embark.benchmark.physics.config import PMSMConfig
 
     scenarios = QUICK_SCENARIOS if quick else STANDARD_SCENARIOS
     results_dir = ensure_results_dir("phase3_discriminative", run_name)
+    pmsm_config = PMSMConfig()
 
     print("=" * 70)
     print("  PVP Phase 3 — Discriminative Power (SC-3)")
@@ -61,14 +126,23 @@ def run_phase3(
 
     suite = BenchmarkSuite(scenarios=scenarios, verbose=True)
 
-    # --- R2: PI baseline (reused from Phase 1, or re-run) ---
-    print("\n  R2: PI baseline via BenchmarkSuite...")
+    # --- R2: PI baseline with trajectory capture ---
+    print("\n  R2: PI baseline (with trajectory capture)...")
     t0 = time.perf_counter()
-    pi_summary = suite.run_baseline(name="PI-baseline", quiet=False)
+    pi_controller = PIControllerAgent.from_system_config(pmsm_config)
+    pi_metrics, pi_trajectories = _run_with_trajectories(
+        pi_controller, scenarios, pmsm_config, "PI-baseline"
+    )
+    # Also run through suite for the official BenchmarkSummary
+    pi_summary = suite.run_baseline(name="PI-baseline", quiet=True)
     print(f"    Done in {time.perf_counter() - t0:.1f} s")
     print(BenchmarkSuite.format_summary(pi_summary))
 
-    # --- R3–R5: SNN models ---
+    # Save PI trajectories
+    for sname, traj in pi_trajectories.items():
+        save_json(traj, results_dir / f"trajectory_PI-baseline_{sname}.json")
+
+    # --- R3–R5: SNN models with trajectory capture ---
     snn_summaries: dict[str, Any] = {}
     run_ids = {"best": "R3", "intermediate": "R4", "poor": "R5"}
 
@@ -78,13 +152,25 @@ def run_phase3(
         t0 = time.perf_counter()
 
         controller, meta = build_snn_controller(spec, device="cpu")
-        summary = suite.run(controller=controller, name=spec.name, quiet=False)
+
+        # Trajectory capture run
+        snn_metrics, snn_trajectories = _run_with_trajectories(
+            controller, scenarios, pmsm_config, spec.name
+        )
+
+        # Official BenchmarkSuite run
+        controller2, _ = build_snn_controller(spec, device="cpu")
+        summary = suite.run(controller=controller2, name=spec.name, quiet=True)
         elapsed = time.perf_counter() - t0
 
         print(BenchmarkSuite.format_summary(summary))
         print(f"    Time: {elapsed:.1f} s")
 
         snn_summaries[spec.name] = summary
+
+        # Save SNN trajectories
+        for sname, traj in snn_trajectories.items():
+            save_json(traj, results_dir / f"trajectory_{spec.name}_{sname}.json")
 
     # --- Extract MAE_q per model per scenario ---
     all_mae: dict[str, dict[str, float]] = {}

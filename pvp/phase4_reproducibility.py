@@ -10,8 +10,8 @@ CPU-only pass: sigma = 0.000000 exactly.
 GPU runs: report bounded sigma as documented limitation.
 
 Usage:
-    poetry run python -m embark-evaluation.evaluation.phase4_reproducibility
-    poetry run python -m embark-evaluation.evaluation.phase4_reproducibility --run pvp_run1
+    poetry run python embark-evaluation/pvp/phase4_reproducibility.py
+    poetry run python embark-evaluation/pvp/phase4_reproducibility.py --run pvp_run1
 """
 
 from __future__ import annotations

@@ -10,8 +10,8 @@ Tolerance: 1e-10 for PI-only float64 path. Deviation > 1e-4 = hard metric bug.
 Step onset: first sample k where |i_q_ref[k] - i_q_ref[k-1]| > 0.01 A.
 
 Usage:
-    poetry run python -m embark-evaluation.evaluation.phase2_metric_validation
-    poetry run python -m embark-evaluation.evaluation.phase2_metric_validation --run pvp_run1
+    poetry run python embark-evaluation/pvp/phase2_metric_validation.py
+    poetry run python embark-evaluation/pvp/phase2_metric_validation.py --run pvp_run1
 """
 
 from __future__ import annotations

@@ -10,8 +10,8 @@ Compares R1 vs R2 trajectories: residual must be < 1e-12 A (pass), > 1e-6 A (har
 Also logs full trajectories (t, i_q_ref, i_q, u_q) for overlay and residual plots.
 
 Usage:
-    poetry run python -m embark-evaluation.evaluation.phase1_correctness
-    poetry run python -m embark-evaluation.evaluation.phase1_correctness --run pvp_run1
+    poetry run python embark-evaluation/pvp/phase1_correctness.py
+    poetry run python embark-evaluation/pvp/phase1_correctness.py --run pvp_run1
 """
 
 from __future__ import annotations

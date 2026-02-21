@@ -13,8 +13,8 @@ Success gate: max_m(MAE_m) - min_m(MAE_m) >= 0.10 * max_m(MAE_m) on at least
 one scenario. If not, halt — probes lack discriminative spread.
 
 Usage:
-    poetry run python -m embark-evaluation.evaluation.phase0_ground_truth
-    poetry run python -m embark-evaluation.evaluation.phase0_ground_truth --run pvp_run1
+    poetry run python embark-evaluation/pvp/phase0_ground_truth.py
+    poetry run python embark-evaluation/pvp/phase0_ground_truth.py --run pvp_run1
 """
 
 from __future__ import annotations

@@ -18,8 +18,8 @@ Per-metric tolerance bands:
   Overshoot:     ±0.5 pp absolute
 
 Usage:
-    poetry run python -m embark-evaluation.evaluation.phase5_hil --host 10.42.0.1 --port 5000
-    poetry run python -m embark-evaluation.evaluation.phase5_hil --host 10.42.0.1 --port 5000 --run pvp_run1
+    poetry run python embark-evaluation/pvp/phase5_hil.py --host 10.42.0.1 --port 5000
+    poetry run python embark-evaluation/pvp/phase5_hil.py --host 10.42.0.1 --port 5000 --run pvp_run1
 """
 
 from __future__ import annotations

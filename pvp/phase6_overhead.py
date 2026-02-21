@@ -9,8 +9,8 @@ Success: Full PVP benchmark (PI + 3 models x scenarios) completes within 2 hours
 Output: per-component timing breakdown table.
 
 Usage:
-    poetry run python -m embark-evaluation.evaluation.phase6_overhead
-    poetry run python -m embark-evaluation.evaluation.phase6_overhead --run pvp_run1
+    poetry run python embark-evaluation/pvp/phase6_overhead.py
+    poetry run python embark-evaluation/pvp/phase6_overhead.py --run pvp_run1
 """
 
 from __future__ import annotations

@@ -17,9 +17,9 @@ Results are saved under:
         pvp_summary.txt
 
 Usage:
-    poetry run python -m embark-evaluation.evaluation.run_all_phases --run pvp_run1
-    poetry run python -m embark-evaluation.evaluation.run_all_phases --run pvp_run1 --quick
-    poetry run python -m embark-evaluation.evaluation.run_all_phases --run pvp_run1 --hil-host 10.42.0.1
+    poetry run python embark-evaluation/pvp/run_all_phases.py --run pvp_run1
+    poetry run python embark-evaluation/pvp/run_all_phases.py --run pvp_run1 --quick
+    poetry run python embark-evaluation/pvp/run_all_phases.py --run pvp_run1 --hil-host 10.42.0.1
 """
 
 from __future__ import annotations
