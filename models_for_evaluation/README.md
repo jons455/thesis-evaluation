@@ -1,6 +1,6 @@
 # Models for Benchmark Evaluation
 
-This directory contains evaluation results and documentation for three SNN controllers selected to validate the benchmark's ability to distinguish between good and poor-performing models.
+This directory contains **the three SNN controller checkpoints** used to validate the benchmark, plus evaluation results and documentation. Everything is in one place: one folder per model, each with the checkpoint and a short README.
 
 ## Purpose
 
@@ -9,21 +9,32 @@ These models are used to **validate the benchmark itself**, demonstrating that:
 - Clear differences between good and bad controllers are captured
 - Failure modes (e.g., instability on negative steps) are detected
 
-## Model Selection
+## Model folders (checkpoints + READMEs)
+
+| Folder | Performance | Original name | Checkpoint in folder |
+|--------|-------------|---------------|----------------------|
+| **[best_incremental_snn/](./best_incremental_snn/)** | **Best** | v12 best_model | `model.pt` |
+| **[intermediate_scheduled_sampling/](./intermediate_scheduled_sampling/)** | **Intermediate** | v10_scheduled_sampling | `model.pt` |
+| **[poor_no_tanh/](./poor_no_tanh/)** | **Poor** | v9_no_tanh | `model.pt` |
+
+Each folder has a **README** with: model description, how it was trained, training/benchmark performance, what it’s good at, and the original version name.
+
+## Model selection (by purpose)
 
 | Model | Performance Category | Purpose |
 |-------|---------------------|---------|
-| **v12 best_model** | **Best** | Demonstrates benchmark captures good controllers |
-| **v10_scheduled_sampling** | **Intermediate** | Shows benchmark distinguishes intermediate performance |
-| **v9_no_tanh** | **Poor** | Validates benchmark flags failures and instability |
+| **best_incremental_snn** (v12) | **Best** | Demonstrates benchmark captures good controllers |
+| **intermediate_scheduled_sampling** (v10) | **Intermediate** | Shows benchmark distinguishes intermediate performance |
+| **poor_no_tanh** (v9) | **Poor** | Validates benchmark flags failures and instability |
 
 ---
 
 ## Model Details
 
-### 1. v12 best_model (Best Performance)
+### 1. best_incremental_snn (v12 best_model — Best Performance)
 
-**Checkpoint:** `evaluation/trained_models/v12/incremental/best_model.pt`
+**Checkpoint (this repo):** `embark-evaluation/models_for_evaluation/best_incremental_snn/model.pt`  
+**Original:** `evaluation/trained_models/v12/incremental/best_model.pt`
 
 **Training Script:** [`notebooks/train_snn_v12.py`](../../notebooks/train_snn_v12.py)
 
@@ -85,9 +96,10 @@ These models are used to **validate the benchmark itself**, demonstrating that:
 
 ---
 
-### 2. v10_scheduled_sampling (Intermediate Performance)
+### 2. intermediate_scheduled_sampling (v10 — Intermediate Performance)
 
-**Checkpoint:** `evaluation/trained_models/v10/v10_scheduled_sampling.pt`
+**Checkpoint (this repo):** `embark-evaluation/models_for_evaluation/intermediate_scheduled_sampling/model.pt`  
+**Original:** `evaluation/trained_models/v10/v10_scheduled_sampling.pt`
 
 **Training Notebook:** [`notebooks/train_snn_v10.ipynb`](../../notebooks/train_snn_v10.ipynb)
 
@@ -149,9 +161,10 @@ These models are used to **validate the benchmark itself**, demonstrating that:
 
 ---
 
-### 3. v9_no_tanh (Poor Performance)
+### 3. poor_no_tanh (v9 — Poor Performance)
 
-**Checkpoint:** `evaluation/trained_models/v9/v9_no_tanh.pt`
+**Checkpoint (this repo):** `embark-evaluation/models_for_evaluation/poor_no_tanh/model.pt`  
+**Original:** `evaluation/trained_models/v9/v9_no_tanh.pt`
 
 **Training Notebook:** [`notebooks/train_snn_v9.ipynb`](../../notebooks/train_snn_v9.ipynb)
 
@@ -212,12 +225,12 @@ Results from full benchmark evaluation are saved in:
 
 | Model | A_step_pos RMSE_q | B_step_neg RMSE_q | C_high_speed RMSE_q | Overall Rank |
 |-------|-------------------|-------------------|---------------------|--------------|
-| **v12 best_model** | 0.724 A | 0.953 A | 1.168 A | **1st (Best)** |
-| **v10_scheduled_sampling** | 0.897 A | 1.539 A | 0.930 A | **2nd (Intermediate)** |
-| **v9_no_tanh** | 1.030 A | **8.567 A** | 2.081 A | **3rd (Poor)** |
+| **best_incremental_snn** (v12) | 0.724 A | 0.953 A | 1.168 A | **1st (Best)** |
+| **intermediate_scheduled_sampling** (v10) | 0.897 A | 1.539 A | 0.930 A | **2nd (Intermediate)** |
+| **poor_no_tanh** (v9) | 1.030 A | **8.567 A** | 2.081 A | **3rd (Poor)** |
 
 **Benchmark Validation:**
-✅ Metrics correctly rank models: v12 < v10 < v9_no_tanh  
+✅ Metrics correctly rank models: best_incremental_snn < intermediate_scheduled_sampling < poor_no_tanh (v12 < v10 < v9)  
 ✅ Large performance gaps are captured (v9_no_tanh B_step_neg: 8.57 A vs v12: 0.95 A)  
 ✅ Failure modes detected (v9_no_tanh instability on negative step)  
 ✅ Consistent across scenarios (v12 best overall, v9 worst overall)
@@ -226,22 +239,26 @@ Results from full benchmark evaluation are saved in:
 
 ## How to Re-run Evaluation
 
+Using the checkpoints in this directory (run from repo root):
+
 ```bash
 # Full evaluation (10 runs × 2000 steps per scenario)
 poetry run python -m evaluation.analysis.evaluate_rate_snn \
-  --model "evaluation/trained_models/v12/incremental/best_model.pt" \
-       "evaluation/trained_models/v10/v10_scheduled_sampling.pt" \
-       "evaluation/trained_models/v9/v9_no_tanh.pt" \
-  --plots-dir "docs/models_for_evaluation/plots"
+  --model "embark-evaluation/models_for_evaluation/best_incremental_snn/model.pt" \
+       "embark-evaluation/models_for_evaluation/intermediate_scheduled_sampling/model.pt" \
+       "embark-evaluation/models_for_evaluation/poor_no_tanh/model.pt" \
+  --plots-dir "embark-evaluation/models_for_evaluation/plots"
 
 # Quick evaluation (3 runs × 500 steps)
 poetry run python -m evaluation.analysis.evaluate_rate_snn \
-  --model "evaluation/trained_models/v12/incremental/best_model.pt" \
-       "evaluation/trained_models/v10/v10_scheduled_sampling.pt" \
-       "evaluation/trained_models/v9/v9_no_tanh.pt" \
-  --plots-dir "docs/models_for_evaluation/plots" \
+  --model "embark-evaluation/models_for_evaluation/best_incremental_snn/model.pt" \
+       "embark-evaluation/models_for_evaluation/intermediate_scheduled_sampling/model.pt" \
+       "embark-evaluation/models_for_evaluation/poor_no_tanh/model.pt" \
+  --plots-dir "embark-evaluation/models_for_evaluation/plots" \
   --quick
 ```
+
+Original paths (still valid): `evaluation/trained_models/v12/incremental/best_model.pt`, `v10/v10_scheduled_sampling.pt`, `v9/v9_no_tanh.pt`.
 
 ---
 
