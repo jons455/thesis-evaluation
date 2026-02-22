@@ -166,9 +166,16 @@ def run_phase5(
         for mk in TOLERANCES:
             v12 = sr12.metrics.get(mk, float("nan"))
             v13 = sr13.metrics.get(mk, float("nan"))
+            if np.isnan(v12) and np.isnan(v13):
+                report_lines.append(f"    {mk}: R12=nan, R13=nan -> PASS (both NaN)")
+                continue
             if np.isnan(v12) or np.isnan(v13):
                 continue
-            ok, dev = _within_tolerance(v13, v12, mk)
+            # Both inf or equal => repeatability pass
+            if np.isinf(v12) and np.isinf(v13):
+                ok, dev = True, 0.0
+            else:
+                ok, dev = _within_tolerance(v13, v12, mk)
             if not ok:
                 sc6a_pass = False
             status = "PASS" if ok else "FAIL"
