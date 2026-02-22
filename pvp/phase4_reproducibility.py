@@ -138,7 +138,8 @@ def run_phase4(
                 sigma = float(np.std(values, ddof=0))
 
             sigma_table[sn][mk] = sigma
-            if sigma > 0.0:
+            # Do not treat NaN sigma as failure (e.g. when metric is undefined for all repeats)
+            if sigma > 0.0 and not np.isnan(sigma):
                 overall_pass = False
 
         # Print key metrics
@@ -146,7 +147,12 @@ def run_phase4(
         for mk in key_metrics:
             if mk in sigma_table[sn]:
                 sigma = sigma_table[sn][mk]
-                status = "EXACT" if sigma == 0.0 else f"sigma={sigma:.2e}"
+                if np.isnan(sigma):
+                    status = "N/A (all NaN)"
+                elif sigma == 0.0:
+                    status = "EXACT"
+                else:
+                    status = f"sigma={sigma:.2e}"
                 line = f"  {mk:<30s}: {status}"
                 report_lines.append(line)
                 print(f"  {sn} / {mk}: {status}")

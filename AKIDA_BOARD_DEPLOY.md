@@ -31,6 +31,9 @@ Leave this terminal open; you’ll start the server here in step 3.
 
 From the **project root** in a **new** terminal (not inside SSH):
 
+**Canonical model location:** `embark-evaluation/models_for_evaluation/akida_hil/akida_model.fbz`  
+Copy your built `.fbz` (and optionally the Keras source) into that folder first; see [models_for_evaluation/akida_hil/README.md](models_for_evaluation/akida_hil/README.md).
+
 **Windows (PowerShell):**
 ```powershell
 cd C:\Users\Jonas\projects\thesis-nueromophic-controller-benchmark
@@ -38,8 +41,8 @@ cd C:\Users\Jonas\projects\thesis-nueromophic-controller-benchmark
 # Inference server
 scp evaluation/akida/server/inference_server.py bcdev@10.42.0.1:~/akida_deployment/server/
 
-# Your .fbz model (adjust path to your model)
-scp evaluation/trained_models/v4/learned_linear/akida/akida_model.fbz bcdev@10.42.0.1:~/akida_deployment/models/
+# .fbz model (canonical location for PVP Phase 5 / TD-HIL)
+scp embark-evaluation/models_for_evaluation/akida_hil/akida_model.fbz bcdev@10.42.0.1:~/akida_deployment/models/
 ```
 
 **Linux / Mac:**
@@ -47,10 +50,10 @@ scp evaluation/trained_models/v4/learned_linear/akida/akida_model.fbz bcdev@10.4
 cd /path/to/thesis-nueromophic-controller-benchmark
 
 scp evaluation/akida/server/inference_server.py bcdev@10.42.0.1:~/akida_deployment/server/
-scp path/to/akida_model.fbz bcdev@10.42.0.1:~/akida_deployment/models/
+scp embark-evaluation/models_for_evaluation/akida_hil/akida_model.fbz bcdev@10.42.0.1:~/akida_deployment/models/
 ```
 
-If your `.fbz` lives elsewhere, change the path accordingly.
+If your `.fbz` is not yet in `models_for_evaluation/akida_hil/`, copy it there from your training output (e.g. `evaluation/trained_models/v4/learned_linear/akida/`) first.
 
 **Optional – inspect script (only if you want to check hardware backend / SDK statistics on the board):**
 ```bash
@@ -79,15 +82,21 @@ Leave this running. You should see something like: `Listening on 0.0.0.0:5000 (e
 
 ---
 
-## 4. On your PC – run TD-HIL benchmark
+## 4. On your PC – run benchmark or PVP Phase 5
 
 In a PC terminal (Terminal 2), from the project root:
 
+**TD-HIL benchmark only:**
 ```bash
 poetry run python embark-evaluation/run_models_benchmark_tdhil.py --host 10.42.0.1 --port 5000
 ```
+Optional: `--quick` for fewer scenarios, `--run my_run` to save under `embark-evaluation/benchmarking-results/`.
 
-Optional: `--quick` for fewer scenarios, `--run my_run` to save under `embark-evaluation/models_for_evaluation/results/my_run/`.
+**PVP Phase 5 (HIL deployment feasibility):**
+```bash
+poetry run python embark-evaluation/pvp/run_all_phases.py --run my_pvp --hil-host 10.42.0.1 --hil-port 5000
+```
+This runs only Phase 5 if you skip other phases, or include Phase 5 in a full PVP run. Results go to `embark-evaluation/pvp/results/my_pvp/phase5_hil/`.
 
 ---
 
@@ -98,6 +107,6 @@ Optional: `--quick` for fewer scenarios, `--run my_run` to save under `embark-ev
 | Connect to board | PC | `ssh bcdev@10.42.0.1` |
 | Activate env     | Board | `source venv_akida/bin/activate` |
 | Copy server      | PC | `scp evaluation/akida/server/inference_server.py bcdev@10.42.0.1:~/akida_deployment/server/` |
-| Copy .fbz        | PC | `scp path/to/akida_model.fbz bcdev@10.42.0.1:~/akida_deployment/models/` |
+| Copy .fbz        | PC | `scp embark-evaluation/models_for_evaluation/akida_hil/akida_model.fbz bcdev@10.42.0.1:~/akida_deployment/models/` |
 | Start server     | Board | `python3 server/inference_server.py --host 0.0.0.0 --port 5000 --model-path models/akida_model.fbz --input-shape "1,1,1,5"` |
 | Run benchmark    | PC | `poetry run python embark-evaluation/run_models_benchmark_tdhil.py --host 10.42.0.1 --port 5000` |
