@@ -115,8 +115,8 @@ def plot_latency_waterfall(results_dir: Path, plots_dir: Path) -> None:
     ax.set_ylim(bottom=0)
 
     plt.tight_layout()
-    out = plots_dir / "p5_1_latency_waterfall.pdf"
-    fig.savefig(out, bbox_inches="tight")
+    out = plots_dir / "p5_1_latency_waterfall.png"
+    fig.savefig(out, bbox_inches="tight", dpi=200)
     plt.close(fig)
     print(f"  Saved: {out.name}")
 
@@ -194,8 +194,8 @@ def plot_sc6a_tolerance_comparison(results_dir: Path, plots_dir: Path) -> None:
     ax.invert_yaxis()
 
     plt.tight_layout()
-    out = plots_dir / "p5_2_sc6a_tolerance_comparison.pdf"
-    fig.savefig(out, bbox_inches="tight")
+    out = plots_dir / "p5_2_sc6a_tolerance_comparison.png"
+    fig.savefig(out, bbox_inches="tight", dpi=200)
     plt.close(fig)
     print(f"  Saved: {out.name}")
 

@@ -2,12 +2,14 @@
 Phase 4 Plots — Reproducibility Validation.
 
 Table 4.1: Per-metric σ heatmap across scenarios (should be zero on CPU).
-Plot 4.1: Metric deviation across repeats — grouped bar showing σ values.
+Plot 4.2: Metric deviation across repeats — grouped bar showing σ values
+          (only generated when meaningful non-zero σ exists).
 """
 
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -19,17 +21,31 @@ def _load_json(path: Path) -> dict:
         return json.load(f)
 
 
-# Key metrics to show in the heatmap (skip rarely informative ones)
+# Threshold below which σ values are treated as zero (floating-point noise)
+_EPSILON = 1e-10
+
+# Key metrics to show (settling_time excluded — often NaN)
 _KEY_METRICS = [
     "mae_i_q",
     "mae_i_d",
     "itae_i_q",
     "itae_i_d",
-    "settling_time_i_q",
     "overshoot",
     "total_syops",
     "mean_sparsity",
 ]
+
+
+def _clean_value(val) -> float:
+    """Return 0.0 for NaN, None, or sub-epsilon values."""
+    if val is None:
+        return 0.0
+    if isinstance(val, float) and math.isnan(val):
+        return 0.0
+    val = float(val)
+    if abs(val) < _EPSILON:
+        return 0.0
+    return val
 
 
 def plot_sigma_heatmap(results_dir: Path, plots_dir: Path) -> None:
@@ -37,6 +53,7 @@ def plot_sigma_heatmap(results_dir: Path, plots_dir: Path) -> None:
 
     Rows = metrics, columns = scenarios.
     Cell values: σ across N repeats (should all be 0.0 on CPU).
+    Sub-epsilon values (< 1e-10) are treated as zero.
     """
     sigma_path = results_dir / "phase4_sigma_table.json"
     if not sigma_path.exists():
@@ -57,11 +74,11 @@ def plot_sigma_heatmap(results_dir: Path, plots_dir: Path) -> None:
     if not metrics:
         metrics = sorted(available)[:10]
 
-    # Build matrix
+    # Build matrix with epsilon-filtering
     data = np.zeros((len(metrics), len(scenario_names)))
     for j, sn in enumerate(scenario_names):
         for i, mk in enumerate(metrics):
-            data[i, j] = sigma_table[sn].get(mk, 0.0)
+            data[i, j] = _clean_value(sigma_table[sn].get(mk, 0.0))
 
     all_zero = np.all(data == 0.0)
 
@@ -114,8 +131,8 @@ def plot_sigma_heatmap(results_dir: Path, plots_dir: Path) -> None:
     )
 
     plt.tight_layout()
-    out = plots_dir / "p4_1_sigma_heatmap.pdf"
-    fig.savefig(out, bbox_inches="tight")
+    out = plots_dir / "p4_1_sigma_heatmap.png"
+    fig.savefig(out, bbox_inches="tight", dpi=200)
     plt.close(fig)
     print(f"  Saved: {out.name}")
 
@@ -123,7 +140,7 @@ def plot_sigma_heatmap(results_dir: Path, plots_dir: Path) -> None:
 def plot_repeat_deviation_bars(results_dir: Path, plots_dir: Path) -> None:
     """Plot 4.2 — Per-metric σ as grouped bars across scenarios.
 
-    Useful when σ > 0 (GPU runs). Skipped if all σ = 0.
+    Only generated when meaningful σ > epsilon exists (i.e., GPU non-determinism).
     """
     sigma_path = results_dir / "phase4_sigma_table.json"
     if not sigma_path.exists():
@@ -140,14 +157,14 @@ def plot_repeat_deviation_bars(results_dir: Path, plots_dir: Path) -> None:
     if not metrics:
         return
 
-    # Check if anything is non-zero
+    # Check if anything is meaningfully non-zero (above epsilon threshold)
     has_nonzero = any(
-        sigma_table[sn].get(mk, 0.0) > 0.0
+        _clean_value(sigma_table[sn].get(mk, 0.0)) > 0.0
         for sn in scenario_names
         for mk in metrics
     )
     if not has_nonzero:
-        print("  [skip] All σ = 0 — no bar chart needed for Plot 4.2")
+        print("  [skip] All sigma ~ 0 (within floating-point noise) - no bar chart needed for Plot 4.2")
         return
 
     x = np.arange(len(metrics))
@@ -157,7 +174,7 @@ def plot_repeat_deviation_bars(results_dir: Path, plots_dir: Path) -> None:
     colors = plt.cm.Set2(np.linspace(0, 1, len(scenario_names)))
 
     for j, sn in enumerate(scenario_names):
-        vals = [sigma_table[sn].get(mk, 0.0) for mk in metrics]
+        vals = [_clean_value(sigma_table[sn].get(mk, 0.0)) for mk in metrics]
         short = sn.replace("step_", "").replace("_", " ")[:25]
         ax.bar(x + j * width, vals, width, color=colors[j], alpha=0.85, label=short)
 
@@ -169,8 +186,8 @@ def plot_repeat_deviation_bars(results_dir: Path, plots_dir: Path) -> None:
     ax.grid(alpha=0.3, axis="y")
 
     plt.tight_layout()
-    out = plots_dir / "p4_2_repeat_deviation_bars.pdf"
-    fig.savefig(out, bbox_inches="tight")
+    out = plots_dir / "p4_2_repeat_deviation_bars.png"
+    fig.savefig(out, bbox_inches="tight", dpi=200)
     plt.close(fig)
     print(f"  Saved: {out.name}")
 
