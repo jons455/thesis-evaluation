@@ -1,0 +1,14 @@
+PVP Phase 2 — Metric Validation
+Scenario: step_mid_speed_1500rpm_2A
+Step onset index: 0
+Steps: 3000, dt: 0.0001
+Generated: 2026-02-22 00:23:58
+
+Metric                            Manual       Pipeline      Deviation      Verdict
+--------------------------------------------------------------------------------
+  MAE_i_q                     0.0070508916   0.0077175582       6.67e-04    HARD FAIL
+  ITAE_i_q                    0.0000051851   0.0000053966       2.12e-07  INVESTIGATE
+  Settling_i_q                         nan   0.0079000000            nan          NaN
+  Overshoot_i_q                        nan 117.5471645679            nan          NaN
+
+Overall SC-2: FAIL
