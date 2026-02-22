@@ -7,6 +7,19 @@ All use STANDARD_SCENARIOS. Full state reset between each model run.
 Pass/fail: ranking order matches Phase 0 ground truth per scenario.
 Float32 precision floor applies; sub-1e-4 A MAE differences are not meaningful.
 
+Why Phase 3 ranking can differ from Phase 0 (PARTIAL FAIL):
+  - Phase 0 runs only the three single-step scenarios (step_low/mid/high at
+    500/1500/2500 rpm) with 3 runs per scenario and defines "best",
+    "intermediate", "poor" by aggregate MAE over those steps only.
+  - Phase 3 runs all six scenarios (including multi_step, four_quadrant,
+    field_weakening) and ranks models per scenario by MAE.
+  - Rankings are scenario-dependent: the model that is "best" on average in
+    Phase 0 may not have the lowest MAE on every single scenario (e.g. at
+    2500 rpm a different model can win). So P0 order (best < intermediate <
+    poor) is an aggregate; P3 order is per-scenario. A MISMATCH means the
+    benchmark is discriminative (order varies by scenario), not that the
+    pipeline is wrong.
+
 Usage:
     poetry run python embark-evaluation/pvp/phase3_discriminative.py
     poetry run python embark-evaluation/pvp/phase3_discriminative.py --run pvp_run1
@@ -223,6 +236,10 @@ def run_phase3(
     if has_p0:
         report_lines.append("")
         report_lines.append("--- Ranking Comparison (Phase 3 vs Phase 0) ---")
+        report_lines.append(
+            "  (P0 = Phase 0 ranking from 3 step scenarios only; P3 = Phase 3 per-scenario ranking. "
+            "Mismatch is expected when best/intermediate/poor differ by scenario.)"
+        )
         snn_names = [m.name for m in MODELS]
         overall_pass = True
 

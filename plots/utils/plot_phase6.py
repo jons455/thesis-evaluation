@@ -101,8 +101,8 @@ def plot_wall_time_bar(results_dir: Path, plots_dir: Path) -> None:
     ax.invert_yaxis()
 
     plt.tight_layout()
-    out = plots_dir / "p6_1_wall_time_breakdown.pdf"
-    fig.savefig(out, bbox_inches="tight")
+    out = plots_dir / "p6_1_wall_time_breakdown.png"
+    fig.savefig(out, bbox_inches="tight", dpi=200)
     plt.close(fig)
     print(f"  Saved: {out.name}")
 
@@ -157,8 +157,8 @@ def plot_inference_speed(results_dir: Path, plots_dir: Path) -> None:
     ax.grid(alpha=0.3, axis="y")
 
     plt.tight_layout()
-    out = plots_dir / "p6_2_inference_speed.pdf"
-    fig.savefig(out, bbox_inches="tight")
+    out = plots_dir / "p6_2_inference_speed.png"
+    fig.savefig(out, bbox_inches="tight", dpi=200)
     plt.close(fig)
     print(f"  Saved: {out.name}")
 

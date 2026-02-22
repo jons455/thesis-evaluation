@@ -77,14 +77,8 @@ def run_phase6(
     timing_results: list[dict[str, Any]] = []
     total_wall = 0.0
 
-    # PI baseline
+    # PI baseline (suite.run_baseline uses internal PI; no controller object to pass)
     print("\n  Profiling PI baseline...")
-    pi_result = _profile_controller(
-        suite.run_baseline.__wrapped__ if hasattr(suite.run_baseline, "__wrapped__") else None,
-        suite,
-        "PI-baseline",
-    )
-    # For PI we use run_baseline
     t0 = time.perf_counter()
     suite.run_baseline(name="PI-baseline", quiet=True)
     pi_wall = time.perf_counter() - t0

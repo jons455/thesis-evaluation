@@ -2,11 +2,11 @@
 PVP Plot Orchestrator — Generate all plots from a completed PVP run.
 
 Reads results from each phase subdirectory and generates publication-ready
-plots into a `plots/` folder, organized by phase.
+plots into ``embark-evaluation/plots/<run_name>/``, organized by phase.
 
 Usage:
-    poetry run python embark-evaluation/pvp/utils/plots/plot_all.py --results-dir results/<run_name>
-    poetry run python embark-evaluation/pvp/utils/plots/plot_all.py --results-dir results/pvp_run1 --skip 5
+    poetry run python embark-evaluation/plots/utils/plot_all.py --results-dir embark-evaluation/pvp/results/<run_name>
+    poetry run python embark-evaluation/plots/utils/plot_all.py --results-dir embark-evaluation/pvp/results/pvp_run1 --skip 5
 """
 
 from __future__ import annotations
@@ -15,11 +15,11 @@ import argparse
 import sys
 from pathlib import Path
 
-# Path setup — same pattern as all PVP scripts
+# Path setup — scripts live under embark-evaluation/plots/utils/
 _this_file = Path(__file__).resolve()
-_plots_dir = _this_file.parent  # pvp/utils/plots/
-_pvp_dir = _plots_dir.parents[1]  # pvp/
-_embark_eval_dir = _pvp_dir.parent  # embark-evaluation/
+_plots_utils_dir = _this_file.parent  # embark-evaluation/plots/utils/
+_plots_dir = _plots_utils_dir.parent  # embark-evaluation/plots/
+_embark_eval_dir = _plots_dir.parent  # embark-evaluation/
 _repo_root = _embark_eval_dir.parent  # repo root
 
 for _p in [str(_repo_root), str(_embark_eval_dir)]:
@@ -44,7 +44,9 @@ def generate_all_plots(results_base: Path, skip: set[int] | None = None) -> None
     if skip is None:
         skip = set()
 
-    plots_root = results_base / "plots"
+    # Output under embark-evaluation/plots/<run_name>/ (run name = results_base dir name)
+    run_name = results_base.name
+    plots_root = _plots_dir / run_name
     print("=" * 70)
     print("  PVP Plot Generator")
     print(f"  Results: {results_base}")
@@ -57,7 +59,7 @@ def generate_all_plots(results_base: Path, skip: set[int] | None = None) -> None
     if 1 not in skip:
         phase1_dir = results_base / "phase1_correctness"
         if phase1_dir.exists():
-            from pvp.utils.plots.plot_phase1 import generate_phase1_plots
+            from plots.utils.plot_phase1 import generate_phase1_plots
             generate_phase1_plots(phase1_dir, plots_root / "phase1")
         else:
             print(f"  [skip] {phase1_dir.name}/ not found")
@@ -66,7 +68,7 @@ def generate_all_plots(results_base: Path, skip: set[int] | None = None) -> None
     if 2 not in skip:
         phase2_dir = results_base / "phase2_metric_validation"
         if phase2_dir.exists():
-            from pvp.utils.plots.plot_phase2 import generate_phase2_plots
+            from plots.utils.plot_phase2 import generate_phase2_plots
             generate_phase2_plots(phase2_dir, plots_root / "phase2")
         else:
             print(f"  [skip] {phase2_dir.name}/ not found")
@@ -75,7 +77,7 @@ def generate_all_plots(results_base: Path, skip: set[int] | None = None) -> None
     if 3 not in skip:
         phase3_dir = results_base / "phase3_discriminative"
         if phase3_dir.exists():
-            from pvp.utils.plots.plot_phase3 import generate_phase3_plots
+            from plots.utils.plot_phase3 import generate_phase3_plots
             generate_phase3_plots(phase3_dir, plots_root / "phase3")
         else:
             print(f"  [skip] {phase3_dir.name}/ not found")
@@ -84,7 +86,7 @@ def generate_all_plots(results_base: Path, skip: set[int] | None = None) -> None
     if 4 not in skip:
         phase4_dir = results_base / "phase4_reproducibility"
         if phase4_dir.exists():
-            from pvp.utils.plots.plot_phase4 import generate_phase4_plots
+            from plots.utils.plot_phase4 import generate_phase4_plots
             generate_phase4_plots(phase4_dir, plots_root / "phase4")
         else:
             print(f"  [skip] {phase4_dir.name}/ not found")
@@ -93,7 +95,7 @@ def generate_all_plots(results_base: Path, skip: set[int] | None = None) -> None
     if 5 not in skip:
         phase5_dir = results_base / "phase5_hil"
         if phase5_dir.exists():
-            from pvp.utils.plots.plot_phase5 import generate_phase5_plots
+            from plots.utils.plot_phase5 import generate_phase5_plots
             generate_phase5_plots(phase5_dir, plots_root / "phase5")
         else:
             print(f"  [skip] {phase5_dir.name}/ not found — run Phase 5 with --host first")
@@ -102,7 +104,7 @@ def generate_all_plots(results_base: Path, skip: set[int] | None = None) -> None
     if 6 not in skip:
         phase6_dir = results_base / "phase6_overhead"
         if phase6_dir.exists():
-            from pvp.utils.plots.plot_phase6 import generate_phase6_plots
+            from plots.utils.plot_phase6 import generate_phase6_plots
             generate_phase6_plots(phase6_dir, plots_root / "phase6")
         else:
             print(f"  [skip] {phase6_dir.name}/ not found")

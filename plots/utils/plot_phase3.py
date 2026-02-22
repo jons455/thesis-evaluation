@@ -1,7 +1,7 @@
 """
 Phase 3 Plots — Discriminative Power.
 
-Plot 3.1: Step response grid (controllers x scenarios).
+Plot 3.1: Envelope comparison — one SNN model vs PI baseline + reference per figure.
 Plot E1:  Relative error vs PI — (MAE_snn - MAE_pi) / MAE_pi.
 Plot 3.2: MAE grouped bar chart, log scale.
 Plot 3.3: ITAE grouped bar chart.
@@ -25,6 +25,7 @@ MODEL_STYLES = {
 }
 
 MODEL_ORDER = ["PI-baseline", "best_incremental_snn", "intermediate_scheduled_sampling", "poor_no_tanh"]
+SNN_MODELS = [m for m in MODEL_ORDER if m != "PI-baseline"]
 
 
 def _get_style(name: str) -> dict:
@@ -48,22 +49,25 @@ def _extract_metric_table(summaries: dict, metric_key: str) -> dict[str, dict[st
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Plot 3.1: Step response grid
+# Plot 3.1: Envelope comparison — one SNN vs PI per figure
 # ──────────────────────────────────────────────────────────────────────
 
-def plot_step_response_grid(results_dir: Path, plots_dir: Path) -> None:
-    """Plot 3.1 — Step response grid, one column per scenario, all controllers overlaid."""
+def plot_envelope_comparison(results_dir: Path, plots_dir: Path) -> None:
+    """Plot 3.1 — Envelope plot: one SNN model vs PI baseline per figure.
+
+    For each SNN model, creates a figure with one column per scenario.
+    Top row: i_q with reference (envelope = fill_between for error band).
+    Bottom row: u_q comparison.
+    """
     traj_files = sorted(results_dir.glob("trajectory_*.json"))
     if not traj_files:
         print("  [skip] No trajectory files for Plot 3.1")
         return
 
     # Group by scenario
-    scenarios_data: dict[str, dict[str, dict]] = {}
+    scenarios_data: dict[str, dict[str, Path]] = {}
     for tf in traj_files:
-        # filename: trajectory_{model}_{scenario}.json
         parts = tf.stem.replace("trajectory_", "")
-        # Find scenario by matching known scenario suffixes
         for model in MODEL_ORDER:
             if parts.startswith(model + "_"):
                 scenario = parts[len(model) + 1:]
@@ -77,45 +81,86 @@ def plot_step_response_grid(results_dir: Path, plots_dir: Path) -> None:
     scenario_names = sorted(scenarios_data.keys())
     n_scen = len(scenario_names)
 
-    fig, axes = plt.subplots(2, n_scen, figsize=(5 * n_scen, 6), sharex=False, squeeze=False)
+    # One figure per SNN model (each compared against PI baseline)
+    for snn_model in SNN_MODELS:
+        snn_style = _get_style(snn_model)
+        pi_style = _get_style("PI-baseline")
 
-    for col, scenario in enumerate(scenario_names):
-        ref_plotted = False
-        for model in MODEL_ORDER:
-            if model not in scenarios_data[scenario]:
+        fig, axes = plt.subplots(2, n_scen, figsize=(4.5 * n_scen, 5), sharex=False, squeeze=False)
+
+        has_data = False
+        for col, scenario in enumerate(scenario_names):
+            pi_path = scenarios_data.get(scenario, {}).get("PI-baseline")
+            snn_path = scenarios_data.get(scenario, {}).get(snn_model)
+
+            if pi_path is None or snn_path is None:
                 continue
-            traj_path = scenarios_data[scenario][model]
-            with open(traj_path) as f:
-                traj = json.load(f)
-            t_ms = np.array(traj["t"]) * 1000
-            i_q = np.array(traj["i_q"])
-            i_q_ref = np.array(traj["i_q_ref"])
-            u_q = np.array(traj["u_q"])
-            style = _get_style(model)
+            has_data = True
 
-            if not ref_plotted:
-                axes[0, col].plot(t_ms, i_q_ref, "k--", lw=1.2, alpha=0.5, label="Reference")
-                ref_plotted = True
+            with open(pi_path) as f:
+                pi_traj = json.load(f)
+            with open(snn_path) as f:
+                snn_traj = json.load(f)
 
-            axes[0, col].plot(t_ms, i_q, color=style["color"], lw=1.0, alpha=0.85, label=style["label"])
-            axes[1, col].plot(t_ms, u_q, color=style["color"], lw=0.8, alpha=0.85, label=style["label"])
+            t_ms = np.array(pi_traj["t"]) * 1000
+            pi_iq = np.array(pi_traj["i_q"])
+            snn_iq = np.array(snn_traj["i_q"])
+            ref_iq = np.array(pi_traj["i_q_ref"])
+            pi_uq = np.array(pi_traj["u_q"])
+            snn_uq = np.array(snn_traj["u_q"])
 
-        short_name = scenario.replace("_", " ").replace("rpm", " rpm").replace("2A", "2 A")
-        axes[0, col].set_title(short_name, fontsize=8, fontweight="bold")
-        axes[0, col].grid(alpha=0.3)
-        axes[1, col].grid(alpha=0.3)
-        axes[1, col].set_xlabel("Time [ms]")
+            ax_iq = axes[0, col]
+            ax_uq = axes[1, col]
 
-    axes[0, 0].set_ylabel("$i_q$ [A]")
-    axes[1, 0].set_ylabel("$v_q$ [V]")
-    axes[0, 0].legend(fontsize=7, loc="best")
+            # Reference
+            ax_iq.plot(t_ms, ref_iq, "k--", lw=1.2, alpha=0.5, label="Reference")
 
-    fig.suptitle("Step Response Comparison — All Controllers", fontweight="bold", y=1.02)
-    plt.tight_layout()
-    out = plots_dir / "p3_1_step_response_grid.pdf"
-    fig.savefig(out, bbox_inches="tight")
-    plt.close(fig)
-    print(f"  Saved: {out.name}")
+            # PI baseline
+            ax_iq.plot(t_ms, pi_iq, color=pi_style["color"], lw=1.0, alpha=0.7, label=pi_style["label"])
+
+            # SNN model
+            ax_iq.plot(t_ms, snn_iq, color=snn_style["color"], lw=1.0, alpha=0.85, label=snn_style["label"])
+
+            # Envelope: fill between PI and SNN to highlight the difference
+            ax_iq.fill_between(
+                t_ms,
+                np.minimum(pi_iq, snn_iq),
+                np.maximum(pi_iq, snn_iq),
+                alpha=0.15, color=snn_style["color"],
+            )
+
+            # Voltage comparison
+            ax_uq.plot(t_ms, pi_uq, color=pi_style["color"], lw=0.8, alpha=0.7, label=pi_style["label"])
+            ax_uq.plot(t_ms, snn_uq, color=snn_style["color"], lw=0.8, alpha=0.85, label=snn_style["label"])
+            ax_uq.fill_between(
+                t_ms,
+                np.minimum(pi_uq, snn_uq),
+                np.maximum(pi_uq, snn_uq),
+                alpha=0.15, color=snn_style["color"],
+            )
+
+            short_name = scenario.replace("_", " ").replace("rpm", " rpm").replace("2A", "2 A")
+            ax_iq.set_title(short_name, fontsize=8, fontweight="bold")
+            ax_iq.grid(alpha=0.3)
+            ax_uq.grid(alpha=0.3)
+            ax_uq.set_xlabel("Time [ms]")
+
+        if not has_data:
+            plt.close(fig)
+            continue
+
+        axes[0, 0].set_ylabel("$i_q$ [A]")
+        axes[1, 0].set_ylabel("$v_q$ [V]")
+        axes[0, 0].legend(fontsize=7, loc="best")
+
+        fig.suptitle(f"Envelope Comparison — {snn_style['label']} vs PI Baseline", fontweight="bold", y=1.02)
+        plt.tight_layout()
+
+        safe_name = snn_model.replace(" ", "_")
+        out = plots_dir / f"p3_1_envelope_{safe_name}.png"
+        fig.savefig(out, bbox_inches="tight", dpi=200)
+        plt.close(fig)
+        print(f"  Saved: {out.name}")
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -170,8 +215,8 @@ def plot_relative_error_vs_pi(results_dir: Path, plots_dir: Path) -> None:
     ax.grid(alpha=0.3, axis="x")
 
     plt.tight_layout()
-    out = plots_dir / "p3_E1_relative_error_vs_pi.pdf"
-    fig.savefig(out, bbox_inches="tight")
+    out = plots_dir / "p3_E1_relative_error_vs_pi.png"
+    fig.savefig(out, bbox_inches="tight", dpi=200)
     plt.close(fig)
     print(f"  Saved: {out.name}")
 
@@ -209,8 +254,8 @@ def plot_mae_grouped_bar(results_dir: Path, plots_dir: Path) -> None:
     ax.grid(alpha=0.3, axis="y")
 
     plt.tight_layout()
-    out = plots_dir / "p3_2_mae_grouped_bar.pdf"
-    fig.savefig(out, bbox_inches="tight")
+    out = plots_dir / "p3_2_mae_grouped_bar.png"
+    fig.savefig(out, bbox_inches="tight", dpi=200)
     plt.close(fig)
     print(f"  Saved: {out.name}")
 
@@ -252,8 +297,8 @@ def plot_itae_grouped_bar(results_dir: Path, plots_dir: Path) -> None:
     ax.grid(alpha=0.3, axis="y")
 
     plt.tight_layout()
-    out = plots_dir / "p3_3_itae_grouped_bar.pdf"
-    fig.savefig(out, bbox_inches="tight")
+    out = plots_dir / "p3_3_itae_grouped_bar.png"
+    fig.savefig(out, bbox_inches="tight", dpi=200)
     plt.close(fig)
     print(f"  Saved: {out.name}")
 
@@ -305,8 +350,8 @@ def plot_syops_vs_mae_pareto(results_dir: Path, plots_dir: Path) -> None:
     )
 
     plt.tight_layout()
-    out = plots_dir / "p3_4_syops_vs_mae_pareto.pdf"
-    fig.savefig(out, bbox_inches="tight")
+    out = plots_dir / "p3_4_syops_vs_mae_pareto.png"
+    fig.savefig(out, bbox_inches="tight", dpi=200)
     plt.close(fig)
     print(f"  Saved: {out.name}")
 
@@ -319,7 +364,7 @@ def generate_phase3_plots(results_dir: Path, plots_dir: Path) -> None:
     """Entry point: generate all Phase 3 plots."""
     plots_dir.mkdir(parents=True, exist_ok=True)
     print("Phase 3 plots:")
-    plot_step_response_grid(results_dir, plots_dir)
+    plot_envelope_comparison(results_dir, plots_dir)
     plot_relative_error_vs_pi(results_dir, plots_dir)
     plot_mae_grouped_bar(results_dir, plots_dir)
     plot_itae_grouped_bar(results_dir, plots_dir)
