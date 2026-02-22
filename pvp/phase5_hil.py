@@ -137,6 +137,11 @@ def run_phase5(
     BenchmarkSuite.save_results(summary_r12, results_dir / "R12_akida_hil.json")
 
     # --- R13: Second HIL pass ---
+    # Close R12's TCP connection so the server can exit its request loop, print summary, and accept R13.
+    # (Otherwise the server stays blocked on recv() and never serves the second connection.)
+    if hasattr(controller_r12.controller, "close"):
+        controller_r12.controller.close()
+    time.sleep(2)  # Let server print summary and return to accept()
     print("\n  R13: Akida HIL pass 2...")
     controller_r13 = _build_hil_controller(host, port, timeout, error_gain, n_max)
     t0 = time.perf_counter()
