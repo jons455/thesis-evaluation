@@ -33,58 +33,34 @@ def plot_deviation_histogram(results_dir: Path, plots_dir: Path) -> None:
 
     metrics = []
     deviations = []
-    verdicts = []
     for c in comparisons:
         dev = c["deviation"]
         if dev is not None and not np.isnan(dev):
             metrics.append(c["metric"])
             deviations.append(dev)
-            verdicts.append(c["verdict"])
 
     if not deviations:
         print("  [skip] No valid deviations for histogram")
         return
 
-    verdict_colors = {
-        "PASS": "#4CAF50",
-        "INVESTIGATE": "#FFC107",
-        "HARD FAIL": "#F44336",
-        "NaN": "#9E9E9E",
-    }
-    colors = [verdict_colors.get(v, "#9E9E9E") for v in verdicts]
-
     fig, ax = plt.subplots(figsize=(8, 4))
     y = np.arange(len(metrics))
-    bars = ax.barh(y, deviations, color=colors, edgecolor="gray", linewidth=0.5)
+    bars = ax.barh(y, deviations, color="#5c5c5c", edgecolor="gray", linewidth=0.5)
 
     ax.set_yticks(y)
     ax.set_yticklabels(metrics, fontsize=9)
     ax.set_xlabel("Absolute Deviation")
     ax.set_xscale("symlog", linthresh=1e-18)
-    ax.set_title(
-        f"Metric Validation — Manual vs Pipeline Deviations\n{scenario}, step onset k={step_onset}",
-        fontweight="bold",
-        fontsize=10,
-    )
+    ax.set_title(f"{scenario}, step onset k={step_onset}", fontsize=10)
     ax.axvline(0, color="black", lw=0.5)
     ax.grid(alpha=0.3, axis="x")
     ax.invert_yaxis()
 
-    # Annotate values
     for bar, dev in zip(bars, deviations):
         ax.text(
             bar.get_width(), bar.get_y() + bar.get_height() / 2,
             f"  {dev:.2e}", va="center", fontsize=7,
         )
-
-    # Legend
-    from matplotlib.patches import Patch
-    legend_elements = [
-        Patch(facecolor="#4CAF50", label="PASS"),
-        Patch(facecolor="#FFC107", label="INVESTIGATE"),
-        Patch(facecolor="#F44336", label="HARD FAIL"),
-    ]
-    ax.legend(handles=legend_elements, fontsize=8, loc="lower right")
 
     plt.tight_layout()
     out = plots_dir / "p2_1_deviation_histogram.png"
@@ -99,24 +75,18 @@ def plot_metric_validation_table(results_dir: Path, plots_dir: Path) -> None:
     if comparisons is None:
         return
 
-    col_labels = ["Metric", "Manual", "Pipeline", "Deviation", "Verdict"]
+    col_labels = ["Metric", "Manual", "Pipeline", "Deviation"]
     cell_text = []
 
     for c in comparisons:
         manual = f"{c['manual']:.10f}" if c["manual"] is not None and not np.isnan(c["manual"]) else "NaN"
         pipeline = f"{c['pipeline']:.10f}" if c["pipeline"] is not None and not np.isnan(c["pipeline"]) else "NaN"
         dev = f"{c['deviation']:.2e}" if c["deviation"] is not None and not np.isnan(c["deviation"]) else "NaN"
-        verdict = c["verdict"]
-        cell_text.append([c["metric"], manual, pipeline, dev, verdict])
+        cell_text.append([c["metric"], manual, pipeline, dev])
 
     fig, ax = plt.subplots(figsize=(10, 0.5 + 0.45 * len(cell_text)))
     ax.axis("off")
-    ax.set_title(
-        f"Table 2.2 — Metric Validation (SC-2)\n{scenario}, step onset k={step_onset}",
-        fontweight="bold",
-        fontsize=11,
-        pad=12,
-    )
+    ax.set_title(f"{scenario}, step onset k={step_onset}", fontsize=11, pad=12)
 
     # White table with light grid
     table = ax.table(
@@ -154,42 +124,32 @@ def plot_deviation_lollipop(results_dir: Path, plots_dir: Path) -> None:
 
     metrics = []
     deviations = []
-    verdicts = []
     for c in comparisons:
         dev = c["deviation"]
         if dev is not None and not np.isnan(dev) and dev > 0:
             metrics.append(c["metric"])
             deviations.append(dev)
-            verdicts.append(c["verdict"])
 
     if not deviations:
         print("  [skip] No non-zero deviations for lollipop chart")
         return
 
-    verdict_colors = {
-        "PASS": "#4CAF50",
-        "INVESTIGATE": "#FFC107",
-        "HARD FAIL": "#F44336",
-    }
-    colors = [verdict_colors.get(v, "#9E9E9E") for v in verdicts]
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-    y = np.arange(len(metrics))
-
-    # Stems
-    for i, (dev, color) in enumerate(zip(deviations, colors)):
+    n_metrics = len(metrics)
+    fig_h = max(2.0, 0.7 * n_metrics)
+    fig, ax = plt.subplots(figsize=(5, fig_h))
+    y = np.arange(n_metrics)
+    color = "#5c5c5c"
+    for i, dev in enumerate(deviations):
         ax.plot([0, dev], [i, i], color=color, lw=2, zorder=2)
-        ax.scatter(dev, i, color=color, s=80, zorder=3, edgecolors="black", linewidths=0.5)
+        ax.scatter(dev, i, color=color, s=60, zorder=3, edgecolors="black", linewidths=0.5)
 
     ax.set_yticks(y)
     ax.set_yticklabels(metrics, fontsize=9)
     ax.set_xscale("log")
+    dev_min, dev_max = min(deviations), max(deviations)
+    ax.set_xlim(dev_min * 0.5, dev_max * 2.5)
     ax.set_xlabel("Absolute Deviation (log scale)")
-    ax.set_title(
-        f"Metric Deviations — Lollipop Chart\n{scenario}, step onset k={step_onset}",
-        fontweight="bold",
-        fontsize=10,
-    )
+    ax.set_title(f"{scenario}, step onset k={step_onset}", fontsize=10)
     ax.grid(alpha=0.3, axis="x")
     ax.invert_yaxis()
 

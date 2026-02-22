@@ -1,0 +1,58 @@
+PVP Phase 4 — Reproducibility
+Model: best_incremental_snn
+Repeats: 3, Seed: 42
+Device: CPU
+Python: 3.11.1
+PyTorch: 2.4.1+cu124
+OS: Windows 10
+Generated: 2026-02-22 02:04:57
+
+Scenario: step_low_speed_500rpm_2A
+  mae_i_q                       : sigma=1.11e-16
+  mae_i_d                       : EXACT
+  settling_time_i_q             : sigma=nan
+  overshoot                     : EXACT
+  total_syops                   : EXACT
+  mean_sparsity                 : EXACT
+
+Scenario: step_mid_speed_1500rpm_2A
+  mae_i_q                       : sigma=1.11e-16
+  mae_i_d                       : EXACT
+  settling_time_i_q             : sigma=nan
+  overshoot                     : sigma=1.42e-14
+  total_syops                   : EXACT
+  mean_sparsity                 : EXACT
+
+Scenario: step_high_speed_2500rpm_2A
+  mae_i_q                       : EXACT
+  mae_i_d                       : EXACT
+  settling_time_i_q             : sigma=nan
+  overshoot                     : EXACT
+  total_syops                   : EXACT
+  mean_sparsity                 : EXACT
+
+Scenario: multi_step_bidirectional_1500rpm
+  mae_i_q                       : sigma=1.11e-16
+  mae_i_d                       : sigma=2.78e-17
+  settling_time_i_q             : sigma=nan
+  overshoot                     : EXACT
+  total_syops                   : EXACT
+  mean_sparsity                 : EXACT
+
+Scenario: four_quadrant_transition_1500rpm
+  mae_i_q                       : EXACT
+  mae_i_d                       : EXACT
+  settling_time_i_q             : sigma=nan
+  overshoot                     : EXACT
+  total_syops                   : EXACT
+  mean_sparsity                 : EXACT
+
+Scenario: field_weakening_2500rpm
+  mae_i_q                       : EXACT
+  mae_i_d                       : sigma=5.55e-17
+  settling_time_i_q             : sigma=nan
+  overshoot                     : EXACT
+  total_syops                   : EXACT
+  mean_sparsity                 : EXACT
+
+Overall SC-4: FAIL (non-zero sigma found)

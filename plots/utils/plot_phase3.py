@@ -16,14 +16,16 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Consistent model styling across all Phase 3 plots
+# Professional, colorblind-friendly palette; neutral labels (no quality interpretation)
 MODEL_STYLES = {
-    "PI-baseline":                     {"color": "#212121", "marker": "s", "label": "PI Baseline"},
-    "best_incremental_snn":            {"color": "#2196F3", "marker": "o", "label": "Best SNN (v12)"},
-    "intermediate_scheduled_sampling": {"color": "#FF9800", "marker": "^", "label": "Intermediate SNN (v10)"},
-    "poor_no_tanh":                    {"color": "#F44336", "marker": "D", "label": "Poor SNN (v9)"},
+    "PI-baseline":                     {"color": "#2d2d2d", "marker": "s", "label": "PI"},
+    "best_incremental_snn":            {"color": "#4477aa", "marker": "o", "label": "SNN (v12)"},
+    "intermediate_scheduled_sampling": {"color": "#228833", "marker": "^", "label": "SNN (v10)"},
+    "poor_no_tanh":                    {"color": "#cc6677", "marker": "D", "label": "SNN (v9)"},
 }
 
+# To include/exclude models: edit MODEL_ORDER (and optionally MODEL_STYLES for new models).
+# Only models in this list are plotted; comment out or remove a name to drop it from all Phase 3 plots.
 MODEL_ORDER = ["PI-baseline", "best_incremental_snn", "intermediate_scheduled_sampling", "poor_no_tanh"]
 SNN_MODELS = [m for m in MODEL_ORDER if m != "PI-baseline"]
 
@@ -153,7 +155,7 @@ def plot_envelope_comparison(results_dir: Path, plots_dir: Path) -> None:
         axes[1, 0].set_ylabel("$v_q$ [V]")
         axes[0, 0].legend(fontsize=7, loc="best")
 
-        fig.suptitle(f"Envelope Comparison — {snn_style['label']} vs PI Baseline", fontweight="bold", y=1.02)
+        fig.suptitle(f"{snn_style['label']} vs PI", fontweight="bold", y=1.02)
         plt.tight_layout()
 
         safe_name = snn_model.replace(" ", "_")
@@ -210,7 +212,6 @@ def plot_relative_error_vs_pi(results_dir: Path, plots_dir: Path) -> None:
     ax.set_yticks(y_positions + bar_height)
     ax.set_yticklabels([s.replace("_", "\n") for s in scenarios], fontsize=7)
     ax.set_xlabel("Relative MAE Difference vs PI")
-    ax.set_title("Relative Tracking Error vs. PI Baseline", fontweight="bold")
     ax.legend(fontsize=8)
     ax.grid(alpha=0.3, axis="x")
 
@@ -249,7 +250,6 @@ def plot_mae_grouped_bar(results_dir: Path, plots_dir: Path) -> None:
     ax.set_xticks(x + width * (len(models) - 1) / 2)
     ax.set_xticklabels([s.replace("_", "\n") for s in scenarios], fontsize=7)
     ax.set_ylabel("MAE $i_q$ [A] (log scale)")
-    ax.set_title("Mean Absolute Error — All Controllers", fontweight="bold")
     ax.legend(fontsize=8)
     ax.grid(alpha=0.3, axis="y")
 
@@ -292,7 +292,6 @@ def plot_itae_grouped_bar(results_dir: Path, plots_dir: Path) -> None:
     ax.set_xticks(x + width * (len(models) - 1) / 2)
     ax.set_xticklabels([s.replace("_", "\n") for s in scenarios], fontsize=7)
     ax.set_ylabel("ITAE $i_q$")
-    ax.set_title("Integral of Time-weighted Absolute Error", fontweight="bold")
     ax.legend(fontsize=8)
     ax.grid(alpha=0.3, axis="y")
 
@@ -337,19 +336,17 @@ def plot_syops_vs_mae_pareto(results_dir: Path, plots_dir: Path) -> None:
 
     ax.set_xlabel("Mean MAE $i_q$ [A]")
     ax.set_ylabel("Mean SyOps per Episode")
-    ax.set_title("Efficiency–Accuracy Trade-off (SyOps vs. MAE)", fontweight="bold")
-    ax.legend(fontsize=8)
+    ax.legend(
+        fontsize=9,
+        loc="center left",
+        bbox_to_anchor=(1.02, 0.5),
+        frameon=True,
+        framealpha=0.95,
+        edgecolor="#ccc",
+    )
     ax.grid(alpha=0.3)
 
-    # Note about rate-coded upper bound
-    ax.text(
-        0.02, 0.02,
-        "SyOps are upper-bound estimates\nfor rate-coded models",
-        transform=ax.transAxes, fontsize=7, fontstyle="italic", alpha=0.6,
-        verticalalignment="bottom",
-    )
-
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 0.85, 1])
     out = plots_dir / "p3_4_syops_vs_mae_pareto.png"
     fig.savefig(out, bbox_inches="tight", dpi=200)
     plt.close(fig)

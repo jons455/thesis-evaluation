@@ -1,0 +1,35 @@
+{
+  "phase0": {
+    "status": "completed",
+    "time_s": 1759.3813270999817
+  },
+  "phase1": {
+    "status": "completed",
+    "overall_pass": true,
+    "time_s": 21.313149800058454
+  },
+  "phase2": {
+    "status": "completed",
+    "overall_pass": false,
+    "time_s": 0.6128666999284178
+  },
+  "phase3": {
+    "status": "completed",
+    "overall_pass": false,
+    "time_s": 4065.9916500999825
+  },
+  "phase4": {
+    "status": "completed",
+    "overall_pass": false,
+    "time_s": 1992.3319747000933
+  },
+  "phase5": {
+    "status": "skipped",
+    "reason": "no --hil-host"
+  },
+  "phase6": {
+    "status": "failed",
+    "error": "'NoneType' object has no attribute 'reset'"
+  },
+  "total_time_s": 7839.706720900023
+}
