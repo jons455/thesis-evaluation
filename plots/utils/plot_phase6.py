@@ -14,20 +14,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-# Consistent coloring matching Phase 3
+# Professional palette (aligned with Phase 3 and Phase 5)
 _CONTROLLER_COLORS = {
-    "PI-baseline":                     "#212121",
-    "best_incremental_snn":            "#2196F3",
-    "intermediate_scheduled_sampling": "#FF9800",
-    "poor_no_tanh":                    "#F44336",
+    "PI-baseline":                     "#2d2d2d",
+    "best_incremental_snn":            "#4477aa",
+    "intermediate_scheduled_sampling": "#228833",
+    "poor_no_tanh":                    "#cc6677",
 }
 
 _CONTROLLER_LABELS = {
-    "PI-baseline":                     "PI Baseline",
-    "best_incremental_snn":            "Best SNN (v12)",
-    "intermediate_scheduled_sampling": "Intermediate SNN (v10)",
-    "poor_no_tanh":                    "Poor SNN (v9)",
+    "PI-baseline":                     "PI",
+    "best_incremental_snn":            "SNN (v12)",
+    "intermediate_scheduled_sampling": "SNN (v10)",
+    "poor_no_tanh":                    "SNN (v9)",
 }
+
+_COLOR_REF = "#2d2d2d"
 
 
 def _load_json(path: Path) -> dict:
@@ -84,19 +86,17 @@ def plot_wall_time_bar(results_dir: Path, plots_dir: Path) -> None:
         0.98, 0.02,
         f"Total: {total_wall:.1f} s ({total_wall / 60:.1f} min)",
         transform=ax.transAxes, fontsize=9, ha="right", va="bottom",
-        bbox=dict(boxstyle="round,pad=0.3", facecolor="#E3F2FD", alpha=0.8),
+        bbox=dict(boxstyle="round,pad=0.3", facecolor="#e8e8e8", alpha=0.9),
     )
 
-    # 2-hour budget (only show if scale makes sense)
     budget_s = 7200
     if total_wall > budget_s * 0.1:
-        ax.axvline(budget_s, color="red", ls="--", lw=1.5, alpha=0.7, label="2-Hour Budget (SC-7)")
+        ax.axvline(budget_s, color=_COLOR_REF, ls="--", lw=1.5, alpha=0.8, label="2 h budget")
         ax.legend(fontsize=8)
 
     ax.set_yticks(y)
     ax.set_yticklabels(names, fontsize=9)
     ax.set_xlabel("Wall Time [s]")
-    ax.set_title("Benchmark Execution Time per Controller", fontweight="bold")
     ax.grid(alpha=0.3, axis="x")
     ax.invert_yaxis()
 
@@ -143,17 +143,15 @@ def plot_inference_speed(results_dir: Path, plots_dir: Path) -> None:
             f"{val:.1f}", ha="center", va="bottom", fontsize=9, fontweight="bold",
         )
 
-    # Control timestep reference (100 µs = 0.1 ms at 10 kHz)
     timestep_us = 100.0
     if max(us_per_step) > timestep_us * 0.3:
-        ax.axhline(timestep_us, color="red", ls="--", lw=1.5, alpha=0.7,
-                    label=f"Control Timestep ({timestep_us:.0f} µs)")
+        ax.axhline(timestep_us, color=_COLOR_REF, ls="--", lw=1.5, alpha=0.8,
+                   label=f"Control timestep ({timestep_us:.0f} µs)")
         ax.legend(fontsize=8)
 
     ax.set_xticks(x)
     ax.set_xticklabels(names, fontsize=9)
     ax.set_ylabel("Time per Step [µs]")
-    ax.set_title("Inference Speed — Simulation Steps per Microsecond", fontweight="bold")
     ax.grid(alpha=0.3, axis="y")
 
     plt.tight_layout()

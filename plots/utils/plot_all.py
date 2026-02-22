@@ -2,7 +2,8 @@
 PVP Plot Orchestrator — Generate all plots from a completed PVP run.
 
 Reads results from each phase subdirectory and generates publication-ready
-plots into ``embark-evaluation/plots/<run_name>/``, organized by phase.
+plots into ``embark-evaluation/plots/phase1/``, ``phase2/``, … ``phase6/``
+directly under the plots directory.
 
 Usage:
     poetry run python embark-evaluation/plots/utils/plot_all.py --results-dir embark-evaluation/pvp/results/<run_name>
@@ -27,7 +28,12 @@ for _p in [str(_repo_root), str(_embark_eval_dir)]:
         sys.path.insert(0, _p)
 
 
-def generate_all_plots(results_base: Path, skip: set[int] | None = None) -> None:
+def generate_all_plots(
+    results_base: Path,
+    skip: set[int] | None = None,
+    phase5_dir_override: Path | None = None,
+    phase6_dir_override: Path | None = None,
+) -> None:
     """Generate plots for all PVP phases from a completed run.
 
     Parameters
@@ -40,19 +46,26 @@ def generate_all_plots(results_base: Path, skip: set[int] | None = None) -> None
           ...
     skip : set of int, optional
         Phase numbers to skip (e.g., {5} to skip HIL plots).
+    phase5_dir_override : Path, optional
+        If set, use this directory for Phase 5 data (phase5_hil); plots still go to plots/phase5/.
+    phase6_dir_override : Path, optional
+        If set, use this directory for Phase 6 data (phase6_overhead); plots still go to plots/phase6/.
     """
     if skip is None:
         skip = set()
 
-    # Output under embark-evaluation/plots/<run_name>/ (run name = results_base dir name)
-    run_name = results_base.name
-    plots_root = _plots_dir / run_name
+    # Phase folders directly under embark-evaluation/plots/ (no run-name subfolder)
+    plots_root = _plots_dir
     print("=" * 70)
     print("  PVP Plot Generator")
     print(f"  Results: {results_base}")
-    print(f"  Output:  {plots_root}")
+    print(f"  Output:  {plots_root} (phase1/ … phase6/)")
     if skip:
         print(f"  Skipping phases: {sorted(skip)}")
+    if phase5_dir_override:
+        print(f"  Phase 5 data: {phase5_dir_override}")
+    if phase6_dir_override:
+        print(f"  Phase 6 data: {phase6_dir_override}")
     print("=" * 70)
 
     # Phase 1
@@ -93,21 +106,21 @@ def generate_all_plots(results_base: Path, skip: set[int] | None = None) -> None
 
     # Phase 5
     if 5 not in skip:
-        phase5_dir = results_base / "phase5_hil"
+        phase5_dir = phase5_dir_override if phase5_dir_override else (results_base / "phase5_hil")
         if phase5_dir.exists():
             from plots.utils.plot_phase5 import generate_phase5_plots
             generate_phase5_plots(phase5_dir, plots_root / "phase5")
         else:
-            print(f"  [skip] {phase5_dir.name}/ not found — run Phase 5 with --host first")
+            print(f"  [skip] phase5_hil/ not found — run Phase 5 with --host first or pass --phase5-dir")
 
     # Phase 6
     if 6 not in skip:
-        phase6_dir = results_base / "phase6_overhead"
+        phase6_dir = phase6_dir_override if phase6_dir_override else (results_base / "phase6_overhead")
         if phase6_dir.exists():
             from plots.utils.plot_phase6 import generate_phase6_plots
             generate_phase6_plots(phase6_dir, plots_root / "phase6")
         else:
-            print(f"  [skip] {phase6_dir.name}/ not found")
+            print(f"  [skip] phase6_overhead/ not found — run Phase 6 or pass --phase6-dir")
 
     print("\n" + "=" * 70)
     print(f"  All plots saved to: {plots_root}")
@@ -131,6 +144,18 @@ def main() -> int:
         default=[],
         help="Phase numbers to skip (e.g., --skip 5 to skip HIL plots).",
     )
+    parser.add_argument(
+        "--phase5-dir",
+        type=str,
+        default=None,
+        help="Use this directory for Phase 5 data; plots still go to output/phase5/.",
+    )
+    parser.add_argument(
+        "--phase6-dir",
+        type=str,
+        default=None,
+        help="Use this directory for Phase 6 data; plots still go to output/phase6/.",
+    )
     args = parser.parse_args()
 
     results_base = Path(args.results_dir).resolve()
@@ -138,7 +163,21 @@ def main() -> int:
         print(f"Error: Results directory not found: {results_base}")
         return 1
 
-    generate_all_plots(results_base, skip=set(args.skip))
+    phase5_override = Path(args.phase5_dir).resolve() if args.phase5_dir else None
+    phase6_override = Path(args.phase6_dir).resolve() if args.phase6_dir else None
+    if phase5_override and not phase5_override.exists():
+        print(f"Error: Phase 5 directory not found: {phase5_override}")
+        return 1
+    if phase6_override and not phase6_override.exists():
+        print(f"Error: Phase 6 directory not found: {phase6_override}")
+        return 1
+
+    generate_all_plots(
+        results_base,
+        skip=set(args.skip),
+        phase5_dir_override=phase5_override,
+        phase6_dir_override=phase6_override,
+    )
     return 0
 
 

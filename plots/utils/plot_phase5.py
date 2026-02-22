@@ -2,17 +2,25 @@
 Phase 5 Plots — HIL Deployment Feasibility.
 
 Plot 5.1: Latency waterfall — round-trip vs chip inference vs 0.1 ms budget.
-Plot 5.2: SC-6a tolerance comparison — R12 vs R13 deviation per metric.
+Plot 5.2: Hardware repeatability — deviation between two HIL runs per metric.
 """
 
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 
+# Professional palette (aligned with Phase 3)
+_COLOR_PASS = "#228833"
+_COLOR_FAIL = "#cc6677"
+_COLOR_CHIP = "#4477aa"
+_COLOR_OVERHEAD = "#ee7733"
+_COLOR_P95 = "#cc6677"
+_COLOR_REF = "#2d2d2d"
 
 # Tolerance bands matching Phase 5 script
 _TOLERANCES = {
@@ -25,8 +33,23 @@ _TOLERANCES = {
 
 
 def _load_json(path: Path) -> dict:
-    with open(path) as f:
-        return json.load(f)
+    text = path.read_text(encoding="utf-8")
+    # Allow non-standard Infinity in JSON (from Phase 5 results)
+    text = text.replace(": Infinity", ": 1e999").replace(": Infinity ", ": 1e999 ")
+    return json.loads(text)
+
+
+def _safe_float(x, default=None):
+    """Convert to float; return default for inf/nan/non-numeric."""
+    if x is None:
+        return default
+    try:
+        v = float(x)
+    except (TypeError, ValueError):
+        return default
+    if math.isfinite(v):
+        return v
+    return default
 
 
 def plot_latency_waterfall(results_dir: Path, plots_dir: Path) -> None:
@@ -42,9 +65,9 @@ def plot_latency_waterfall(results_dir: Path, plots_dir: Path) -> None:
 
     data = _load_json(data_path)
     r12 = data.get("R12", {})
-    scenarios_data = r12.get("scenario_results", [])
+    scenarios_data = r12.get("scenario_results") or r12.get("scenarios", [])
     if not scenarios_data:
-        print("  [skip] No scenario results in R12 for Plot 5.1")
+        print("  [skip] No scenario results for Plot 5.1")
         return
 
     scenario_names = []
@@ -61,7 +84,7 @@ def plot_latency_waterfall(results_dir: Path, plots_dir: Path) -> None:
         if mean_lat is None:
             continue
 
-        scenario_names.append(sr.get("scenario_name", "unknown"))
+        scenario_names.append(sr.get("scenario_name") or sr.get("name", "unknown"))
         mean_roundtrip.append(float(mean_lat))
         p95_roundtrip.append(float(p95_lat) if p95_lat is not None else float(mean_lat))
         chip_time_ms.append(float(chip_us) / 1000.0 if chip_us is not None else 0.0)
@@ -80,36 +103,33 @@ def plot_latency_waterfall(results_dir: Path, plots_dir: Path) -> None:
 
     bars_chip = ax.bar(
         x - width / 2, chip_time_ms, width,
-        color="#4CAF50", alpha=0.85, label="Chip Inference"
+        color=_COLOR_CHIP, alpha=0.85, label="Chip Inference"
     )
     bars_overhead = ax.bar(
         x - width / 2, overhead_ms, width,
         bottom=chip_time_ms,
-        color="#FF9800", alpha=0.85, label="Network + Host Overhead"
+        color=_COLOR_OVERHEAD, alpha=0.85, label="Network + Host Overhead"
     )
     bars_p95 = ax.bar(
         x + width / 2, p95_roundtrip, width,
-        color="#F44336", alpha=0.65, label="P95 Round-Trip"
+        color=_COLOR_P95, alpha=0.75, label="P95 Round-Trip"
     )
 
-    # 0.1 ms budget line
     timestep_ms = 0.1
     ax.axhline(
-        timestep_ms, color="red", ls="--", lw=1.5, alpha=0.8,
+        timestep_ms, color=_COLOR_REF, ls="--", lw=1.5, alpha=0.8,
         label=f"Control Timestep ({timestep_ms} ms)"
     )
 
-    # Annotate values
     for i, (mean_rt, p95, chip) in enumerate(zip(mean_roundtrip, p95_roundtrip, chip_time_ms)):
         ax.text(i - width / 2, mean_rt + 0.02 * max(mean_roundtrip),
                 f"{mean_rt:.3f}", ha="center", va="bottom", fontsize=7, fontweight="bold")
         ax.text(i + width / 2, p95 + 0.02 * max(p95_roundtrip),
-                f"{p95:.3f}", ha="center", va="bottom", fontsize=7, color="#F44336")
+                f"{p95:.3f}", ha="center", va="bottom", fontsize=7, color=_COLOR_P95)
 
     ax.set_xticks(x)
     ax.set_xticklabels([s.replace("_", "\n") for s in scenario_names], fontsize=7)
     ax.set_ylabel("Latency [ms]")
-    ax.set_title("HIL Latency Breakdown — Chip Inference vs. Round-Trip", fontweight="bold")
     ax.legend(fontsize=8, loc="upper right")
     ax.grid(alpha=0.3, axis="y")
     ax.set_ylim(bottom=0)
@@ -122,9 +142,9 @@ def plot_latency_waterfall(results_dir: Path, plots_dir: Path) -> None:
 
 
 def plot_sc6a_tolerance_comparison(results_dir: Path, plots_dir: Path) -> None:
-    """Plot 5.2 — SC-6a hardware repeatability: R12 vs R13 deviation vs tolerance band.
+    """Plot 5.2 — Hardware repeatability: deviation between two HIL runs vs tolerance.
 
-    Horizontal bar chart, one bar per metric×scenario, colored by pass/fail.
+    Two outputs: a compact table (primary), and a zoomed bar chart when all values are small.
     """
     data_path = results_dir / "phase5_results.json"
     if not data_path.exists():
@@ -132,72 +152,120 @@ def plot_sc6a_tolerance_comparison(results_dir: Path, plots_dir: Path) -> None:
         return
 
     data = _load_json(data_path)
-    r12_scenarios = data.get("R12", {}).get("scenario_results", [])
-    r13_scenarios = data.get("R13", {}).get("scenario_results", [])
+    run1 = data.get("R12", {})
+    run2 = data.get("R13", {})
+    s1 = run1.get("scenario_results") or run1.get("scenarios", [])
+    s2 = run2.get("scenario_results") or run2.get("scenarios", [])
 
-    if not r12_scenarios or not r13_scenarios:
-        print("  [skip] Need both R12 and R13 data for Plot 5.2")
+    if not s1 or not s2:
+        print("  [skip] Need both run data for Plot 5.2")
         return
 
-    labels = []
-    deviations = []
-    tolerances = []
-    passes = []
+    rows = []  # (metric_label, scenario_short, v1, v2, dev, band, passed, norm)
 
-    for sr12, sr13 in zip(r12_scenarios, r13_scenarios):
-        sn = sr12.get("scenario_name", "?")
-        m12 = sr12.get("metrics", {})
-        m13 = sr13.get("metrics", {})
+    for sr1, sr2 in zip(s1, s2):
+        sn = sr1.get("scenario_name") or sr1.get("name", "?")
+        m1 = sr1.get("metrics", {})
+        m2 = sr2.get("metrics", {})
+        short_scenario = sn.replace("step_", "").replace("_", " ")[:22]
 
         for mk, tol_info in _TOLERANCES.items():
-            v12 = m12.get(mk)
-            v13 = m13.get(mk)
-            if v12 is None or v13 is None:
+            v1 = _safe_float(m1.get(mk))
+            v2 = _safe_float(m2.get(mk))
+            if v1 is None or v2 is None:
                 continue
 
-            v12, v13 = float(v12), float(v13)
-            dev = abs(v13 - v12)
-
+            dev = abs(v2 - v1)
             if tol_info["type"] == "relative":
-                band = tol_info["value"] * abs(v12) if abs(v12) > 1e-12 else 1e-12
+                band = tol_info["value"] * abs(v1) if abs(v1) > 1e-12 else 1e-12
             else:
                 band = tol_info["value"]
 
             passed = dev <= band
-            short_scenario = sn.replace("step_", "").replace("_", " ")[:20]
-            labels.append(f"{tol_info['label']}\n({short_scenario})")
-            deviations.append(dev / band if band > 0 else 0.0)  # Normalized to tolerance
-            tolerances.append(band)
-            passes.append(passed)
+            norm = (dev / band) if band > 0 else 0.0
+            rows.append((tol_info["label"], short_scenario, v1, v2, dev, band, passed, norm))
 
-    if not labels:
+    if not rows:
         print("  [skip] No metrics to compare for Plot 5.2")
         return
 
+    # ─── 1) Table figure (clear when all within tolerance) ───
+    cell_text = []
+    for (metric_label, scenario, v1, v2, dev, band, passed, _) in rows:
+        status = "yes" if passed else "no"
+        cell_text.append([
+            metric_label,
+            scenario,
+            f"{v1:.4g}",
+            f"{v2:.4g}",
+            f"{dev:.4g}",
+            f"{band:.4g}",
+            status,
+        ])
+    col_labels = ["Metric", "Scenario", "Run 1", "Run 2", "|diff|", "Tol", "Pass"]
+
+    fig_table, ax_table = plt.subplots(figsize=(10, 0.4 + 0.32 * len(cell_text)))
+    ax_table.axis("off")
+    table = ax_table.table(
+        cellText=cell_text,
+        colLabels=col_labels,
+        loc="center",
+        cellLoc="center",
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(8)
+    table.scale(1.0, 1.4)
+    for key, cell in table.get_celld().items():
+        cell.set_edgecolor("#ccc")
+        cell.set_linewidth(0.5)
+        if key[0] == 0:
+            cell.set_facecolor("#f0f0f0")
+            cell.set_text_props(fontweight="bold")
+        else:
+            cell.set_facecolor("white")
+    plt.tight_layout()
+    out_table = plots_dir / "p5_2_repeatability_table.png"
+    fig_table.savefig(out_table, bbox_inches="tight", dpi=200)
+    plt.close(fig_table)
+    print(f"  Saved: {out_table.name}")
+
+    # ─── 2) Bar chart with x-axis zoomed to data (so small deviations are visible) ───
+    labels = [f"{r[0]}\n({r[1]})" for r in rows]
+    norms = [r[7] for r in rows]
+    passes = [r[6] for r in rows]
+    # Bar width: at least a small visible amount for zero
+    display_vals = [max(n, 0.003) for n in norms]
+
     y = np.arange(len(labels))
-    colors = ["#4CAF50" if p else "#F44336" for p in passes]
+    colors = [_COLOR_PASS if p else _COLOR_FAIL for p in passes]
 
-    fig, ax = plt.subplots(figsize=(9, max(4, 0.5 * len(labels))))
-    ax.barh(y, deviations, color=colors, alpha=0.8, edgecolor="gray", linewidth=0.5)
+    fig, ax = plt.subplots(figsize=(8, max(3.5, 0.45 * len(labels))))
+    ax.barh(y, display_vals, color=colors, alpha=0.85, edgecolor="gray", linewidth=0.5)
 
-    # Tolerance boundary at 1.0 (normalized)
-    ax.axvline(1.0, color="red", ls="--", lw=1.5, alpha=0.8, label="Tolerance Limit")
-
+    max_norm = max(norms)
+    if max_norm <= 0:
+        x_max = 0.05
+    elif max_norm < 0.15:
+        x_max = max(0.08, max_norm * 2.0)
+    elif max_norm < 1.0:
+        x_max = min(1.2, max_norm * 1.3)
+    else:
+        x_max = max(1.2, max_norm * 1.1)
+    ax.set_xlim(0, x_max)
+    if x_max <= 1.5:
+        ax.axvline(1.0, color=_COLOR_REF, ls="--", lw=1.5, alpha=0.8, label="Tolerance (1.0)")
     ax.set_yticks(y)
     ax.set_yticklabels(labels, fontsize=7)
-    ax.set_xlabel("Deviation / Tolerance Band (normalized)")
-    ax.set_title("SC-6a Hardware Repeatability — R12 vs R13", fontweight="bold")
+    ax.set_xlabel("Deviation / tolerance (normalized)")
     ax.legend(fontsize=8)
     ax.grid(alpha=0.3, axis="x")
-
-    # Invert so first metric is at top
     ax.invert_yaxis()
 
     plt.tight_layout()
-    out = plots_dir / "p5_2_sc6a_tolerance_comparison.png"
-    fig.savefig(out, bbox_inches="tight", dpi=200)
+    out_bars = plots_dir / "p5_2_sc6a_tolerance_comparison.png"
+    fig.savefig(out_bars, bbox_inches="tight", dpi=200)
     plt.close(fig)
-    print(f"  Saved: {out.name}")
+    print(f"  Saved: {out_bars.name}")
 
 
 def generate_phase5_plots(results_dir: Path, plots_dir: Path) -> None:
