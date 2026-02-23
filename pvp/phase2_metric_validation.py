@@ -5,13 +5,9 @@ Uses R2 data (PI via wrapper) on `step_mid_speed_1500rpm_2A`, float64.
 Computes MAE, ITAE, Settling Time, Overshoot manually from the trajectory
 using NumPy, and compares against the pipeline accumulator values.
 
-Tolerances (deviation = |manual - pipeline|):
-  - dev < 1e-10: PASS (exact).
-  - dev < 1e-3:  INVESTIGATE (relaxed from 1e-4 to allow minor numerical
-    differences between manual and pipeline implementations).
-  - dev >= 1e-3: HARD FAIL (metric bug likely).
-Metrics where either manual or pipeline is NaN are reported as N/A and do
-not affect overall pass/fail.
+This script is pure data collection — it records deviations between manual
+and pipeline implementations without issuing any PASS/FAIL verdicts.
+All interpretation is done in interpret_results.py.
 
 Step onset: first sample k where |i_q_ref[k] - i_q_ref[k-1]| > 0.01 A.
 
@@ -159,7 +155,11 @@ def _manual_overshoot(
 
 
 def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
-    """Execute Phase 2: manual NumPy metric validation against pipeline."""
+    """Execute Phase 2: manual NumPy metric validation against pipeline.
+
+    Pure data collection — no PASS/FAIL verdicts issued here.
+    All interpretation is in interpret_results.py.
+    """
     setup_deterministic(seed)
 
     from embark.benchmark.agents import PIControllerAgent
@@ -238,7 +238,7 @@ def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
     manual_settling = _manual_settling_time(i_q, i_q_ref, dt, step_onset)
     manual_overshoot = _manual_overshoot(i_q, i_q_ref, step_onset)
 
-    # Compare
+    # Collect comparisons (raw data, no verdicts)
     comparisons: list[dict[str, Any]] = []
     report_lines: list[str] = [
         "PVP Phase 2 — Metric Validation",
@@ -247,11 +247,10 @@ def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
         f"Steps: {step}, dt: {dt}",
         f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
-        f"{'Metric':<25s} {'Manual':>14s} {'Pipeline':>14s} {'Deviation':>14s} {'Verdict':>12s}",
-        "-" * 80,
+        f"{'Metric':<25s} {'Manual':>14s} {'Pipeline':>14s} {'Deviation':>14s}",
+        "-" * 70,
     ]
 
-    overall_pass = True
     metric_pairs = [
         ("MAE_i_q", manual_mae, pipeline_results.get("mae_i_q", float("nan"))),
         ("ITAE_i_q", manual_itae, pipeline_results.get("itae_i_q", float("nan"))),
@@ -262,36 +261,26 @@ def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
     for name, manual_val, pipeline_val in metric_pairs:
         if np.isnan(manual_val) or np.isnan(pipeline_val):
             dev = float("nan")
-            verdict = "N/A"
         else:
             dev = abs(manual_val - pipeline_val)
-            if dev < 1e-10:
-                verdict = "PASS"
-            elif dev < 1e-3:
-                verdict = "INVESTIGATE"
-            else:
-                verdict = "HARD FAIL"
-                overall_pass = False
 
         comp = {
             "metric": name,
             "manual": manual_val,
             "pipeline": pipeline_val,
             "deviation": dev,
-            "verdict": verdict,
         }
         comparisons.append(comp)
 
         manual_str = "N/A" if np.isnan(manual_val) else f"{manual_val:14.10f}"
         pipe_str = "N/A" if np.isnan(pipeline_val) else f"{pipeline_val:14.10f}"
         dev_str = "N/A" if np.isnan(dev) else f"{dev:14.2e}"
-        line = f"  {name:<25s} {manual_str:>14s} {pipe_str:>14s} {dev_str:>14s} {verdict:>12s}"
+        line = f"  {name:<25s} {manual_str:>14s} {pipe_str:>14s} {dev_str:>14s}"
         print(line)
         report_lines.append(line)
 
     report_lines.append("")
-    report_lines.append(f"Overall SC-2: {'PASS' if overall_pass else 'FAIL'}")
-    print(f"\n  Overall SC-2: {'PASS' if overall_pass else 'FAIL'}")
+    report_lines.append("(No pass/fail verdicts — see interpret_results.py)")
 
     # Save
     save_json(
@@ -299,14 +288,13 @@ def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
             "scenario": target_scenario.name,
             "step_onset": step_onset,
             "comparisons": comparisons,
-            "overall_pass": overall_pass,
             "pipeline_metrics": pipeline_results,
         },
         results_dir / "phase2_validation.json",
     )
     save_text_report(report_lines, results_dir / "phase2_report.txt")
 
-    return {"comparisons": comparisons, "overall_pass": overall_pass}
+    return {"comparisons": comparisons}
 
 
 def main() -> int:

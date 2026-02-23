@@ -6,8 +6,16 @@ same seed, same config. STANDARD_SCENARIOS, metrics only.
 
 Full state reset between every repeat and every scenario.
 
-CPU-only pass: sigma = 0.000000 exactly.
-GPU runs: report bounded sigma as documented limitation.
+This script is pure data collection — it records per-metric sigma values
+without issuing any PASS/FAIL verdicts.
+All interpretation is done in interpret_results.py.
+
+Notes on sigma values:
+  - sigma = 0.0 (reported as EXACT): bitwise identical across repeats.
+  - sigma in (0, 1e-10]: float64 rounding noise — functionally deterministic.
+  - sigma > 1e-10: genuine non-determinism (GPU atomics, etc.).
+  - sigma = nan: all values were Inf (controller never settled) — normal for
+    high-error SNN models; not treated as a failure.
 
 Usage:
     poetry run python embark-evaluation/pvp/phase4_reproducibility.py
@@ -17,6 +25,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import math
 import platform
 import sys
 import time
@@ -42,13 +51,26 @@ from pvp.utils.common import (
 )
 
 
+def _sigma_status(sigma: float) -> str:
+    """Human-readable label for a sigma value (no pass/fail verdict)."""
+    if math.isnan(sigma):
+        return "sigma=nan (all non-finite)"
+    if sigma == 0.0:
+        return "EXACT"
+    return f"sigma={sigma:.2e}"
+
+
 def run_phase4(
     run_name: str | None = None,
     seed: int = 42,
     n_repeats: int = 3,
     quick: bool = False,
 ) -> dict:
-    """Execute Phase 4: reproducibility validation."""
+    """Execute Phase 4: reproducibility validation.
+
+    Pure data collection — no PASS/FAIL verdicts issued here.
+    All interpretation is in interpret_results.py.
+    """
     from embark.benchmark.harness import (
         QUICK_SCENARIOS,
         STANDARD_SCENARIOS,
@@ -116,51 +138,56 @@ def run_phase4(
         f"OS: {platform.system()} {platform.release()}",
         f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
+        "Notes:",
+        "  EXACT         — bitwise identical across all repeats",
+        "  sigma < 1e-10 — float64 rounding noise, functionally deterministic",
+        "  sigma > 1e-10 — genuine non-determinism",
+        "  sigma=nan     — all values non-finite (controller never settled)",
+        "",
     ]
 
     sigma_table: dict[str, dict[str, float]] = {}
-    overall_pass = True
 
     for sn in scenario_names:
         report_lines.append(f"Scenario: {sn}")
         sigma_table[sn] = {}
 
         for mk in numeric_keys:
-            values = []
+            # Separate finite and non-finite values
+            finite_values = []
+            non_finite_count = 0
             for run in all_run_metrics:
                 v = run.get(sn, {}).get(mk)
-                if v is not None and isinstance(v, (int, float)) and not np.isnan(v):
-                    values.append(float(v))
+                if v is not None and isinstance(v, (int, float)):
+                    if math.isfinite(v):
+                        finite_values.append(float(v))
+                    else:
+                        non_finite_count += 1
 
-            if len(values) < 2:
+            if non_finite_count == n_repeats:
+                # All values non-finite (e.g. never-settling controller): report NaN sigma
+                sigma = float("nan")
+            elif len(finite_values) < 2:
+                # Only one finite value available — treat as exact
                 sigma = 0.0
             else:
-                sigma = float(np.std(values, ddof=0))
+                sigma = float(np.std(finite_values, ddof=0))
 
             sigma_table[sn][mk] = sigma
-            # Do not treat NaN sigma as failure (e.g. when metric is undefined for all repeats)
-            if sigma > 0.0 and not np.isnan(sigma):
-                overall_pass = False
 
         # Print key metrics
         key_metrics = ["mae_i_q", "mae_i_d", "settling_time_i_q", "overshoot", "total_syops", "mean_sparsity"]
         for mk in key_metrics:
             if mk in sigma_table[sn]:
                 sigma = sigma_table[sn][mk]
-                if np.isnan(sigma):
-                    status = "N/A (all NaN)"
-                elif sigma == 0.0:
-                    status = "EXACT"
-                else:
-                    status = f"sigma={sigma:.2e}"
+                status = _sigma_status(sigma)
                 line = f"  {mk:<30s}: {status}"
                 report_lines.append(line)
                 print(f"  {sn} / {mk}: {status}")
 
         report_lines.append("")
 
-    report_lines.append(f"Overall SC-4: {'PASS (sigma=0 for all)' if overall_pass else 'FAIL (non-zero sigma found)'}")
-    print(f"\n  Overall SC-4: {'PASS' if overall_pass else 'FAIL'}")
+    report_lines.append("(No pass/fail verdicts — see interpret_results.py)")
 
     # Save
     save_json(sigma_table, results_dir / "phase4_sigma_table.json")
@@ -170,7 +197,7 @@ def run_phase4(
     )
     save_text_report(report_lines, results_dir / "phase4_report.txt")
 
-    return {"sigma_table": sigma_table, "overall_pass": overall_pass}
+    return {"sigma_table": sigma_table}
 
 
 def main() -> int:

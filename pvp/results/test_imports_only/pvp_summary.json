@@ -1,0 +1,25 @@
+{
+  "phase0": {
+    "status": "skipped"
+  },
+  "phase1": {
+    "status": "skipped"
+  },
+  "phase2": {
+    "status": "skipped"
+  },
+  "phase3": {
+    "status": "skipped"
+  },
+  "phase4": {
+    "status": "skipped"
+  },
+  "phase5": {
+    "status": "skipped",
+    "reason": "skipped"
+  },
+  "phase6": {
+    "status": "skipped"
+  },
+  "total_time_s": 9.300070814788342e-06
+}
