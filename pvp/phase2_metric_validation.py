@@ -5,6 +5,11 @@ Uses R2 data (PI via wrapper) on `step_mid_speed_1500rpm_2A`, float64.
 Computes MAE, ITAE, Settling Time, Overshoot manually from the trajectory
 using NumPy, and compares against the pipeline accumulator values.
 
+MAE alignment: the pipeline (TrackingMAE) receives update(state, reference, ...)
+and uses (reference, state) at each step — i.e. ref_t vs state at step start.
+The manual MAE is therefore computed as mean(|i_q_ref - i_q_at_step_start|)
+so it matches the pipeline; using next_state caused ~6.7e-4 deviation.
+
 This script is pure data collection — it records deviations between manual
 and pipeline implementations without issuing any PASS/FAIL verdicts.
 All interpretation is done in interpret_results.py.
@@ -49,7 +54,7 @@ def _find_step_onset(i_q_ref: np.ndarray, threshold: float = 0.01) -> int:
 
 
 def _manual_mae(i_q: np.ndarray, i_q_ref: np.ndarray) -> float:
-    """Full-episode MAE (same definition as TrackingMAE)."""
+    """Full-episode MAE: mean(|i_q_ref - i_q|). Use i_q aligned with pipeline (see below)."""
     return float(np.mean(np.abs(i_q_ref - i_q)))
 
 
@@ -197,11 +202,22 @@ def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
     for m in metrics:
         m.reset()
 
-    trajectory = {"i_q": [], "i_q_ref": [], "i_d": [], "i_d_ref": [], "u_q": [], "u_d": []}
+    trajectory = {
+        "i_q": [],
+        "i_q_ref": [],
+        "i_q_at_step_start": [],  # state["i_q"] at start of step (pipeline alignment)
+        "i_d": [],
+        "i_d_ref": [],
+        "u_q": [],
+        "u_d": [],
+    }
     step = 0
     done = False
 
     while not done and step < target_scenario.max_steps:
+        # Pipeline metrics receive (state, reference, ...); they typically use ref vs state.
+        trajectory["i_q_at_step_start"].append(float(state["i_q"]))
+
         action = controller(state, reference)
         controller_info = getattr(controller, "last_info", None)
         next_state, next_ref, done = task.step(action)
@@ -229,11 +245,15 @@ def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
             pipeline_results[m.name] = result
 
     # Manual computation
-    i_q = np.array(trajectory["i_q"])
+    i_q = np.array(trajectory["i_q"])  # next_state["i_q"] after each step
+    i_q_at_step_start = np.array(trajectory["i_q_at_step_start"])  # state["i_q"] at step start
     i_q_ref = np.array(trajectory["i_q_ref"])
     step_onset = _find_step_onset(i_q_ref)
 
-    manual_mae = _manual_mae(i_q, i_q_ref)
+    # Pipeline TrackingMAE uses (reference, state) at each update, i.e. ref_t vs state_t.
+    # So we use state at step start for MAE to match pipeline; otherwise deviation ~6e-4.
+    manual_mae = _manual_mae(i_q_at_step_start, i_q_ref)
+    manual_mae_next = _manual_mae(i_q, i_q_ref)  # kept for diagnostics
     manual_itae = _manual_itae(i_q, i_q_ref, dt, step_onset)
     manual_settling = _manual_settling_time(i_q, i_q_ref, dt, step_onset)
     manual_overshoot = _manual_overshoot(i_q, i_q_ref, step_onset)
@@ -282,13 +302,14 @@ def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
     report_lines.append("")
     report_lines.append("(No pass/fail verdicts — see interpret_results.py)")
 
-    # Save
+    # Save (include manual_mae_next for diagnostics: MAE using next_state vs ref)
     save_json(
         {
             "scenario": target_scenario.name,
             "step_onset": step_onset,
             "comparisons": comparisons,
             "pipeline_metrics": pipeline_results,
+            "manual_mae_next_state": manual_mae_next,
         },
         results_dir / "phase2_validation.json",
     )

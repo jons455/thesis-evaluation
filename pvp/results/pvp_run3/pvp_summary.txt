@@ -1,0 +1,15 @@
+PVP — Pipeline Validation Protocol Summary
+Run: pvp_run3
+Total time: 10335.8 s (172.3 min)
+
+Phase                          Status         Pass       Time
+------------------------------------------------------------
+  phase0                         completed         -    1968.8s
+  phase1                         completed      True      18.6s
+  phase2                         completed         -       0.6s
+  phase3                         completed      True    4069.1s
+  phase4                         completed         -    2053.6s
+  phase5                         skipped           -          -
+  phase6                         completed      True    2225.1s
+------------------------------------------------------------
+  Total: 10335.8 s
