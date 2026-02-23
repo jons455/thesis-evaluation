@@ -1,0 +1,14 @@
+PVP Phase 2 — Metric Validation
+Scenario: step_mid_speed_1500rpm_2A
+Step onset index: 0
+Steps: 3000, dt: 0.0001
+Generated: 2026-02-23 11:36:56
+
+Metric                            Manual       Pipeline      Deviation
+----------------------------------------------------------------------
+  MAE_i_q                     0.0070508916   0.0077175582       6.67e-04
+  ITAE_i_q                    0.0000051851   0.0000053966       2.12e-07
+  Settling_i_q                         N/A   0.0079000000            N/A
+  Overshoot_i_q                        N/A 117.5471645679            N/A
+
+(No pass/fail verdicts — see interpret_results.py)

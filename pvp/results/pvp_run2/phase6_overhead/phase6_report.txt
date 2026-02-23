@@ -1,0 +1,15 @@
+PVP Phase 6 — Overhead Profiling
+Generated: 2026-02-23 14:02:25
+Mode: STANDARD
+
+Controller                                  Wall Time    Steps    us/step
+------------------------------------------------------------------------
+  PI-baseline                                     6.21s      N/A        N/A
+  best_incremental_snn                          700.39s    34000    20599.8
+  intermediate_scheduled_sampling               706.00s    34000    20764.8
+  poor_no_tanh                                  695.21s    34000    20447.4
+------------------------------------------------------------------------
+  TOTAL                                        2107.82s
+
+  SC-7 budget: 7200 s (2 hours)
+  SC-7: PASS (total=2108 s)
