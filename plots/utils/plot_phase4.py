@@ -10,18 +10,23 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from pathlib import Path
 
+import matplotlib.colors
 import matplotlib.pyplot as plt
 import numpy as np
 
 
 def _load_json(path: Path) -> dict:
-    with open(path) as f:
-        return json.load(f)
+    """Load JSON; tolerate non-standard Infinity and NaN in numbers."""
+    text = path.read_text(encoding="utf-8")
+    text = re.sub(r":\s*Infinity\b", ": null", text)
+    text = re.sub(r":\s*NaN\b", ": null", text)
+    return json.loads(text)
 
 
-# Threshold below which σ values are treated as zero (floating-point noise)
+# Threshold below which σ is considered "deterministic" (float64 noise)
 _EPSILON = 1e-10
 
 # Key metrics to show (settling_time excluded — often NaN)
@@ -37,7 +42,7 @@ _KEY_METRICS = [
 
 
 def _clean_value(val) -> float:
-    """Return 0.0 for NaN, None, or sub-epsilon values."""
+    """Return 0.0 for NaN, None, or sub-epsilon values (for pass/fail and color scale)."""
     if val is None:
         return 0.0
     if isinstance(val, float) and math.isnan(val):
@@ -48,12 +53,33 @@ def _clean_value(val) -> float:
     return val
 
 
+def _raw_sigma(val) -> float | None:
+    """Return numeric sigma or None for NaN (for accurate display)."""
+    if val is None:
+        return None
+    if isinstance(val, float) and math.isnan(val):
+        return None
+    return float(val)
+
+
+def _cell_text(val: float | None) -> str:
+    """Format sigma for cell annotation: 0, scientific, or — for NaN."""
+    if val is None or (isinstance(val, float) and math.isnan(val)):
+        return "—"
+    v = float(val)
+    if v == 0.0:
+        return "0"
+    if abs(v) < 1e-20:
+        return "≈0"
+    return f"{v:.1e}"
+
+
 def plot_sigma_heatmap(results_dir: Path, plots_dir: Path) -> None:
     """Table 4.1 — Per-metric σ heatmap across scenarios.
 
     Rows = metrics, columns = scenarios.
-    Cell values: σ across N repeats (should all be 0.0 on CPU).
-    Sub-epsilon values (< 1e-10) are treated as zero.
+    Cell values: actual σ across N repeats (0, float-noise e.g. 1e-16, or — for NaN).
+    σ < 1e-10 is deterministic (PASS); only σ > 1e-10 indicates non-determinism.
     """
     sigma_path = results_dir / "phase4_sigma_table.json"
     if not sigma_path.exists():
@@ -74,47 +100,62 @@ def plot_sigma_heatmap(results_dir: Path, plots_dir: Path) -> None:
     if not metrics:
         metrics = sorted(available)[:10]
 
-    # Build matrix with epsilon-filtering
-    data = np.zeros((len(metrics), len(scenario_names)))
+    # Raw matrix for display (keep actual σ; None for NaN)
+    raw = np.empty((len(metrics), len(scenario_names)), dtype=object)
     for j, sn in enumerate(scenario_names):
         for i, mk in enumerate(metrics):
-            data[i, j] = _clean_value(sigma_table[sn].get(mk, 0.0))
+            raw[i, j] = _raw_sigma(sigma_table[sn].get(mk))
 
-    all_zero = np.all(data == 0.0)
+    # For color scale: treat sub-epsilon as 0; NaN as 0 so we can still decide "all pass"
+    data = np.zeros((len(metrics), len(scenario_names)))
+    for i in range(len(metrics)):
+        for j in range(len(scenario_names)):
+            v = raw[i, j]
+            if v is None or math.isnan(v):
+                data[i, j] = 0.0
+            else:
+                data[i, j] = 0.0 if abs(v) < _EPSILON else v
+
+    all_pass = np.all(data == 0.0)  # all exact 0 or below epsilon
+    any_nonzero = np.any(data > 0.0)
 
     # --- Heatmap ---
     fig, ax = plt.subplots(figsize=(max(8, 2 * len(scenario_names)), max(4, 0.6 * len(metrics))))
 
-    if all_zero:
-        # All zeros: use a uniform green color
-        cmap = plt.cm.Greens
+    if not any_nonzero:
+        # All σ = 0 or < 1e-10: single green shade; show actual values in cells
         im = ax.imshow(
-            np.zeros_like(data),
+            np.zeros((len(metrics), len(scenario_names))),
             aspect="auto",
-            cmap=cmap,
+            cmap=plt.cm.Greens,
             vmin=0,
             vmax=1,
         )
+        cbar = plt.colorbar(im, ax=ax, shrink=0.7)
+        cbar.set_label("σ (all below 1e-10 → deterministic)", fontsize=9)
     else:
-        cmap = plt.cm.YlOrRd
+        # Some non-zero σ: use YlOrRd on log scale so small values are visible
+        data_plot = np.where(data <= 0, 1e-20, data)
         im = ax.imshow(
-            data,
+            data_plot,
             aspect="auto",
-            cmap=cmap,
+            cmap=plt.cm.YlOrRd,
+            norm=matplotlib.colors.LogNorm(vmin=1e-20, vmax=data_plot.max() or 1),
         )
         plt.colorbar(im, ax=ax, label="σ (standard deviation)", shrink=0.7)
 
-    # Annotate cells
+    # Annotate each cell with actual σ (0, 1.1e-16, or —)
     for i in range(len(metrics)):
         for j in range(len(scenario_names)):
-            val = data[i, j]
-            if val == 0.0:
-                text = "0"
-                color = "white" if not all_zero else "darkgreen"
+            v = raw[i, j]
+            text = _cell_text(v)
+            # Contrast: dark text on light green when all pass; white/black when range varies
+            if not any_nonzero:
+                color = "darkgreen"
             else:
-                text = f"{val:.2e}"
-                color = "white" if val > data.max() * 0.5 else "black"
-            ax.text(j, i, text, ha="center", va="center", fontsize=8, color=color, fontweight="bold")
+                cell_val = data[i, j]
+                color = "white" if cell_val > (np.nanmax(data) * 0.4) else "black"
+            ax.text(j, i, text, ha="center", va="center", fontsize=7, color=color, fontweight="bold")
 
     # Axis labels
     short_scenarios = [s.replace("_", "\n") for s in scenario_names]
@@ -123,9 +164,9 @@ def plot_sigma_heatmap(results_dir: Path, plots_dir: Path) -> None:
     ax.set_yticks(np.arange(len(metrics)))
     ax.set_yticklabels([m.replace("_", " ") for m in metrics], fontsize=8)
 
-    verdict = "σ = 0 for all metrics (PASS)" if all_zero else "Non-zero σ detected — check GPU non-determinism"
+    verdict = "σ = 0 or < 1e-10 for all (deterministic, PASS)" if all_pass else "Non-zero σ detected — check GPU non-determinism"
     ax.set_title(
-        f"Reproducibility — Per-Metric Standard Deviation Across Repeats\n({verdict})",
+        f"Reproducibility — Per-Metric σ Across Repeats (R6–R8)\n{verdict}",
         fontweight="bold",
         fontsize=10,
     )

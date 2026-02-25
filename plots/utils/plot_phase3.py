@@ -42,8 +42,11 @@ def _get_style(name: str) -> dict:
 
 
 def _load_json(path: Path) -> dict:
-    with open(path) as f:
-        return json.load(f)
+    """Load JSON; tolerate non-standard 'Infinity' in phase results."""
+    import re
+    text = path.read_text(encoding="utf-8")
+    text = re.sub(r":\s*Infinity\b", ": null", text)
+    return json.loads(text)
 
 
 def _extract_metric_table(summaries: dict, metric_key: str) -> dict[str, dict[str, float]]:
@@ -740,6 +743,7 @@ def plot_neuromorphic_radar_snn_vs_snn(results_dir: Path, plots_dir: Path) -> No
     Compares SNN models on: total_syops (lower better), mean_sparsity (higher better),
     min_sparsity (higher better), total_spikes (lower better). All axes normalized to
     [0, 1] with outer = better. PI is excluded since it has no neuromorphic metrics.
+    Tries fallback keys (e.g. syops, sparsity) when harness uses different names.
     """
     summ_path = results_dir / "phase3_summaries.json"
     if not summ_path.exists():
@@ -752,31 +756,34 @@ def plot_neuromorphic_radar_snn_vs_snn(results_dir: Path, plots_dir: Path) -> No
         print("  [skip] Need at least 2 SNN models for neuromorphic SNN vs SNN plot")
         return
 
-    def _mean_metric(model: str, key: str) -> float:
-        vals = list(_get_scenario_metrics(summaries, model, key).values())
-        finite = [v for v in vals if v is not None and not (np.isnan(v) or np.isinf(v))]
-        return float(np.mean(finite)) if finite else float("nan")
-
-    # Neuromorphic metric keys: (key, label, lower_is_better)
+    # Primary key and optional fallbacks (harness may use "syops" vs "total_syops", etc.)
     neuro_defs = [
-        ("total_syops", r"SyOps (eff.)", True),       # lower = better → invert for score
-        ("mean_sparsity", r"Sparsity (mean)", False), # higher = better
-        ("min_sparsity", r"Sparsity (min)", False),
-        ("total_spikes", r"Spikes (eff.)", True),     # lower = better
+        (["total_syops", "syops"], r"SyOps (eff.)", True),
+        (["mean_sparsity", "sparsity"], r"Sparsity (mean)", False),
+        (["min_sparsity"], r"Sparsity (min)", False),
+        (["total_spikes", "spikes"], r"Spikes (eff.)", True),
     ]
 
-    # Collect raw values per model
+    def _mean_metric_with_fallbacks(model: str, keys: list[str]) -> float:
+        for key in keys:
+            vals = list(_get_scenario_metrics(summaries, model, key).values())
+            finite = [v for v in vals if v is not None and not (np.isnan(v) or np.isinf(v))]
+            if finite:
+                return float(np.mean(finite))
+        return float("nan")
+
+    # Collect raw values per model (one value per axis)
     raw: dict[str, list[float]] = {m: [] for m in snn_models}
     for model in snn_models:
-        for key, _, _ in neuro_defs:
-            raw[model].append(_mean_metric(model, key))
+        for keys, _, _ in neuro_defs:
+            raw[model].append(_mean_metric_with_fallbacks(model, keys))
 
     # Normalize to scores in [0, 1], outer = better
     n_metrics = len(neuro_defs)
     scores: dict[str, list[float]] = {}
     for model in snn_models:
         scores[model] = []
-    for j, (key, _, lower_better) in enumerate(neuro_defs):
+    for j, (_, _, lower_better) in enumerate(neuro_defs):
         vals = [raw[m][j] for m in snn_models]
         valid = [v for v in vals if not (v is None or np.isnan(v) or np.isinf(v))]
         if not valid:

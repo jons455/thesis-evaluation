@@ -1,4 +1,4 @@
-PVP — Pipeline Validation Protocol Summary
+PVP — Pipeline Verification Procedure Summary
 Run: test_imports_only
 Total time: 0.0 s (0.0 min)
 

@@ -145,6 +145,13 @@ def main() -> int:
         help="Phase numbers to skip (e.g., --skip 5 to skip HIL plots).",
     )
     parser.add_argument(
+        "--only",
+        type=int,
+        nargs="*",
+        default=[],
+        help="If set, generate only these phase numbers (e.g., --only 5 for Phase 5 only).",
+    )
+    parser.add_argument(
         "--phase5-dir",
         type=str,
         default=None,
@@ -172,9 +179,15 @@ def main() -> int:
         print(f"Error: Phase 6 directory not found: {phase6_override}")
         return 1
 
+    only_phases = set(args.only) if args.only else None
+    if only_phases:
+        skip = set(range(1, 7)) - only_phases
+    else:
+        skip = set(args.skip)
+
     generate_all_plots(
         results_base,
-        skip=set(args.skip),
+        skip=skip,
         phase5_dir_override=phase5_override,
         phase6_dir_override=phase6_override,
     )

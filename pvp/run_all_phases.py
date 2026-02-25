@@ -66,7 +66,7 @@ def main() -> int:
     skip_phases = set(args.skip)
 
     print("=" * 70)
-    print("  PVP — Pipeline Validation Protocol")
+    print("  PVP — Pipeline Verification Procedure")
     print(f"  Run: {run_name}")
     print(f"  Seed: {args.seed}")
     print(f"  Mode: {'QUICK' if args.quick else 'STANDARD'}")
@@ -258,7 +258,7 @@ def main() -> int:
     print("=" * 70)
 
     summary_lines: list[str] = [
-        "PVP — Pipeline Validation Protocol Summary",
+        "PVP — Pipeline Verification Procedure Summary",
         f"Run: {run_name}",
         f"Total time: {total_time:.1f} s ({total_time / 60:.1f} min)",
         "",

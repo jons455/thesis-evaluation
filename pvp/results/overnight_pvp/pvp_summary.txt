@@ -1,4 +1,4 @@
-PVP — Pipeline Validation Protocol Summary
+PVP — Pipeline Verification Procedure Summary
 Run: overnight_pvp
 Total time: 7839.7 s (130.7 min)
 
