@@ -14,9 +14,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Professional palette (aligned with Phase 3)
-_COLOR_PASS = "#228833"
-_COLOR_FAIL = "#cc6677"
+# Professional palette (aligned with Phase 3) — neutral: within vs outside tolerance
+_COLOR_WITHIN = "#228833"
+_COLOR_OUTSIDE = "#cc6677"
 _COLOR_CHIP = "#4477aa"
 _COLOR_OVERHEAD = "#ee7733"
 _COLOR_P95 = "#cc6677"
@@ -181,9 +181,9 @@ def plot_sc6a_tolerance_comparison(results_dir: Path, plots_dir: Path) -> None:
             else:
                 band = tol_info["value"]
 
-            passed = dev <= band
+            within_tol = dev <= band
             norm = (dev / band) if band > 0 else 0.0
-            rows.append((tol_info["label"], short_scenario, v1, v2, dev, band, passed, norm))
+            rows.append((tol_info["label"], short_scenario, v1, v2, dev, band, within_tol, norm))
 
     if not rows:
         print("  [skip] No metrics to compare for Plot 5.2")
@@ -191,8 +191,8 @@ def plot_sc6a_tolerance_comparison(results_dir: Path, plots_dir: Path) -> None:
 
     # ─── 1) Table figure (clear when all within tolerance) ───
     cell_text = []
-    for (metric_label, scenario, v1, v2, dev, band, passed, _) in rows:
-        status = "yes" if passed else "no"
+    for (metric_label, scenario, v1, v2, dev, band, within_tol, _) in rows:
+        status = "within" if within_tol else "outside"
         cell_text.append([
             metric_label,
             scenario,
@@ -202,7 +202,7 @@ def plot_sc6a_tolerance_comparison(results_dir: Path, plots_dir: Path) -> None:
             f"{band:.4g}",
             status,
         ])
-    col_labels = ["Metric", "Scenario", "Run 1", "Run 2", "|diff|", "Tol", "Pass"]
+    col_labels = ["Metric", "Scenario", "Run 1", "Run 2", "|diff|", "Tol", "Within tol."]
 
     fig_table, ax_table = plt.subplots(figsize=(10, 0.4 + 0.32 * len(cell_text)))
     ax_table.axis("off")
@@ -232,12 +232,12 @@ def plot_sc6a_tolerance_comparison(results_dir: Path, plots_dir: Path) -> None:
     # ─── 2) Bar chart with x-axis zoomed to data (so small deviations are visible) ───
     labels = [f"{r[0]}\n({r[1]})" for r in rows]
     norms = [r[7] for r in rows]
-    passes = [r[6] for r in rows]
+    within_tols = [r[6] for r in rows]
     # Bar width: at least a small visible amount for zero
     display_vals = [max(n, 0.003) for n in norms]
 
     y = np.arange(len(labels))
-    colors = [_COLOR_PASS if p else _COLOR_FAIL for p in passes]
+    colors = [_COLOR_WITHIN if w else _COLOR_OUTSIDE for w in within_tols]
 
     fig, ax = plt.subplots(figsize=(8, max(3.5, 0.45 * len(labels))))
     ax.barh(y, display_vals, color=colors, alpha=0.85, edgecolor="gray", linewidth=0.5)

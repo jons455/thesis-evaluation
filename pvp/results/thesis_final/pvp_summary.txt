@@ -1,0 +1,15 @@
+PVP — Pipeline Verification Procedure Summary
+Run: thesis_final
+Total time: 10891.6 s (181.5 min)
+
+Phase                          Status         Pass       Time
+------------------------------------------------------------
+  phase0                         completed         -    2436.3s
+  phase1                         completed      True      19.7s
+  phase2                         completed         -       0.6s
+  phase3                         completed      True    4233.5s
+  phase4                         completed         -    2104.4s
+  phase5                         skipped           -          -
+  phase6                         completed      True    2097.1s
+------------------------------------------------------------
+  Total: 10891.6 s

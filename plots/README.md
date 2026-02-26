@@ -12,6 +12,10 @@ poetry run python embark-evaluation/plots/utils/plot_all.py --results-dir embark
 
 **Examples**
 
+- **Thesis run** (canonical run for the thesis):
+  ```bash
+  poetry run python embark-evaluation/plots/utils/plot_all.py --results-dir embark-evaluation/pvp/results/thesis_final
+  ```
 - Full run (skip Phase 5 if you have no HIL data):
   ```bash
   poetry run python embark-evaluation/plots/utils/plot_all.py --results-dir embark-evaluation/pvp/results/pvp_run3 --skip 5
@@ -84,8 +88,10 @@ poetry run python embark-evaluation/plots/utils/plot_all.py --results-dir embark
 
 | File | Description |
 |------|-------------|
-| `phase6/p6_1_wall_time_breakdown.png` | **Plot 6.1** — Wall time per controller (horizontal bars) with 2 h budget line. |
+| `phase6/p6_1_wall_time_breakdown.png` | **Plot 6.1** — Wall time per controller for the **Phase 6 run only** (one sweep: PI + 3 SNNs × scenarios). The total shown is *not* the full PVP time. The 2 h line is the SC-7 budget. When `pvp_summary.json` exists, the plot also shows **Full PVP (all phases)** from that run. |
 | `phase6/p6_2_inference_speed.png` | **Plot 6.2** — Inference speed (µs per step) comparison. |
+
+**Note:** If Phase 6 was run with `--quick` (2 scenarios), the total may be ~7–12 min; that is only this profiling run, not the full thesis evaluation. The full PVP (Phases 0–6 with STANDARD scenarios) typically takes ~2.5–3 h; see `pvp_summary.txt` for the actual total.
 
 ---
 

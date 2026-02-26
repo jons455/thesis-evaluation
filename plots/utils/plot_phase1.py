@@ -87,8 +87,8 @@ def plot_residual_trace(results_dir: Path, plots_dir: Path) -> None:
         residual = np.abs(r1["i_q"][:n] - r2["i_q"][:n])
 
         ax.plot(t_ms, residual, color="#1565C0", lw=0.8)
-        ax.axhline(1e-12, color="green", ls="--", lw=0.8, alpha=0.7, label="Pass ($10^{-12}$ A)")
-        ax.axhline(1e-6, color="red", ls="--", lw=0.8, alpha=0.7, label="Hard fail ($10^{-6}$ A)")
+        ax.axhline(1e-12, color="green", ls="--", lw=0.8, alpha=0.7, label="Reference ($10^{-12}$ A)")
+        ax.axhline(1e-6, color="red", ls="--", lw=0.8, alpha=0.7, label="Reference ($10^{-6}$ A)")
         ax.set_yscale("symlog", linthresh=1e-15)
         ax.set_ylabel("|R1 − R2| [A]")
         ax.set_title(scenario, fontsize=9)

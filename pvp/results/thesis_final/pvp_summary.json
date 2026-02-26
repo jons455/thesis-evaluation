@@ -1,0 +1,36 @@
+{
+  "phase0": {
+    "status": "completed",
+    "time_s": 2436.3220616
+  },
+  "phase1": {
+    "status": "completed",
+    "overall_pass": true,
+    "time_s": 19.6652854999993
+  },
+  "phase2": {
+    "status": "completed",
+    "overall_pass": null,
+    "time_s": 0.5814109000020835
+  },
+  "phase3": {
+    "status": "completed",
+    "overall_pass": true,
+    "time_s": 4233.5377286
+  },
+  "phase4": {
+    "status": "completed",
+    "overall_pass": null,
+    "time_s": 2104.3981195999986
+  },
+  "phase5": {
+    "status": "skipped",
+    "reason": "no --hil-host"
+  },
+  "phase6": {
+    "status": "completed",
+    "feasible": true,
+    "time_s": 2097.0705918999993
+  },
+  "total_time_s": 10891.587278399998
+}

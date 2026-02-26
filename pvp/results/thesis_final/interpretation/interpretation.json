@@ -1,0 +1,98 @@
+{
+  "phase0": {
+    "status": "missing",
+    "scenarios": {}
+  },
+  "phase1": {
+    "status": "ok",
+    "overall_pass": true,
+    "scenarios": {
+      "step_low_speed_500rpm_2A": {
+        "max_residual_iq_A": 0.0,
+        "mean_residual_iq_A": 0.0,
+        "max_residual_uq_V": 0.0,
+        "steps_compared": 3000,
+        "verdict": "PASS (< 1e-12 A)"
+      },
+      "step_mid_speed_1500rpm_2A": {
+        "max_residual_iq_A": 0.0,
+        "mean_residual_iq_A": 0.0,
+        "max_residual_uq_V": 0.0,
+        "steps_compared": 3000,
+        "verdict": "PASS (< 1e-12 A)"
+      },
+      "step_high_speed_2500rpm_2A": {
+        "max_residual_iq_A": 0.0,
+        "mean_residual_iq_A": 0.0,
+        "max_residual_uq_V": 0.0,
+        "steps_compared": 3000,
+        "verdict": "PASS (< 1e-12 A)"
+      },
+      "multi_step_bidirectional_1500rpm": {
+        "max_residual_iq_A": 0.0,
+        "mean_residual_iq_A": 0.0,
+        "max_residual_uq_V": 0.0,
+        "steps_compared": 10000,
+        "verdict": "PASS (< 1e-12 A)"
+      },
+      "four_quadrant_transition_1500rpm": {
+        "max_residual_iq_A": 0.0,
+        "mean_residual_iq_A": 0.0,
+        "max_residual_uq_V": 0.0,
+        "steps_compared": 9000,
+        "verdict": "PASS (< 1e-12 A)"
+      },
+      "field_weakening_2500rpm": {
+        "max_residual_iq_A": 0.0,
+        "mean_residual_iq_A": 0.0,
+        "max_residual_uq_V": 0.0,
+        "steps_compared": 6000,
+        "verdict": "PASS (< 1e-12 A)"
+      }
+    }
+  },
+  "phase2": {
+    "status": "ok",
+    "overall_pass": true,
+    "scenario": "step_mid_speed_1500rpm_2A",
+    "step_onset": 0,
+    "comparisons": [
+      {
+        "metric": "MAE_i_q",
+        "manual": 0.0077175582369421875,
+        "pipeline": 0.007717558236942155,
+        "deviation": 3.209238430557093e-17,
+        "verdict": "EXACT (< 1e-10)"
+      },
+      {
+        "metric": "ITAE_i_q",
+        "manual": 5.185062920917938e-06,
+        "pipeline": 5.396583155812556e-06,
+        "deviation": 2.1152023489461834e-07,
+        "verdict": "INVESTIGATE (< 1e-3)"
+      },
+      {
+        "metric": "Settling_i_q",
+        "manual": NaN,
+        "pipeline": 0.007900000000000008,
+        "deviation": NaN,
+        "verdict": "N/A (nan)"
+      },
+      {
+        "metric": "Overshoot_i_q",
+        "manual": NaN,
+        "pipeline": 117.54716456787877,
+        "deviation": NaN,
+        "verdict": "N/A (nan)"
+      }
+    ]
+  },
+  "phase3": {
+    "status": "missing",
+    "scenarios": {}
+  },
+  "phase4": {
+    "status": "missing",
+    "scenarios": {}
+  }
+}

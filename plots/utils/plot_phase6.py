@@ -48,8 +48,8 @@ def _get_label(name: str) -> str:
 def plot_wall_time_bar(results_dir: Path, plots_dir: Path) -> None:
     """Plot 6.1 — Total wall-time per controller with 2-hour budget line.
 
-    Simple horizontal bar chart showing how long each controller takes
-    for the full scenario suite.
+    Shows Phase 6 run only (one sweep: PI + 3 models × scenarios). The 2 h line
+    is the SC-7 budget. Full PVP (all phases 0–6) takes longer; see pvp_summary.txt.
     """
     timing_path = results_dir / "phase6_timing.json"
     if not timing_path.exists():
@@ -70,6 +70,10 @@ def plot_wall_time_bar(results_dir: Path, plots_dir: Path) -> None:
     y = np.arange(len(names))
 
     fig, ax = plt.subplots(figsize=(9, max(3, 0.8 * len(names))))
+
+    # Title: make clear this is Phase 6 run only, not full PVP
+    ax.set_title("Phase 6 run: PI + 3 SNNs × scenarios (this run only; full PVP = all phases)", fontsize=10)
+
     bars = ax.barh(y, wall_times, color=colors, alpha=0.85, edgecolor="gray", linewidth=0.5)
 
     # Annotate each bar with time
@@ -81,17 +85,28 @@ def plot_wall_time_bar(results_dir: Path, plots_dir: Path) -> None:
         ax.text(bar.get_width() + max(wall_times) * 0.02, bar.get_y() + bar.get_height() / 2,
                 time_str, ha="left", va="center", fontsize=9, fontweight="bold")
 
-    # Total annotation
+    # Total annotation: Phase 6 total + optional full PVP from pvp_summary
+    run_dir = results_dir.parent
+    pvp_summary_path = run_dir / "pvp_summary.json"
+    total_lines = [f"Phase 6 total: {total_wall:.1f} s ({total_wall / 60:.1f} min)"]
+    try:
+        if pvp_summary_path.exists():
+            summary = _load_json(pvp_summary_path)
+            full_pvp_s = summary.get("total_time_s")
+            if isinstance(full_pvp_s, (int, float)) and full_pvp_s > 0:
+                total_lines.append(f"Full PVP (all phases): {full_pvp_s / 60:.1f} min")
+    except Exception:
+        pass
     ax.text(
         0.98, 0.02,
-        f"Total: {total_wall:.1f} s ({total_wall / 60:.1f} min)",
+        "\n".join(total_lines),
         transform=ax.transAxes, fontsize=9, ha="right", va="bottom",
         bbox=dict(boxstyle="round,pad=0.3", facecolor="#e8e8e8", alpha=0.9),
     )
 
     budget_s = 7200
     if total_wall > budget_s * 0.1:
-        ax.axvline(budget_s, color=_COLOR_REF, ls="--", lw=1.5, alpha=0.8, label="2 h budget")
+        ax.axvline(budget_s, color=_COLOR_REF, ls="--", lw=1.5, alpha=0.8, label="SC-7 budget (2 h)")
         ax.legend(fontsize=8)
 
     ax.set_yticks(y)

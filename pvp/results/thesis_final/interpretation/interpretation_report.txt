@@ -1,0 +1,42 @@
+PVP Interpretation Report
+Source: C:\Users\Jonas\projects\thesis-nueromophic-controller-benchmark\embark-evaluation\pvp\results\thesis_final
+Generated: 2026-02-26 17:13:34
+
+Thresholds:
+  Phase 0: spread >= 10% of max MAE per scenario
+  Phase 1: max|R1-R2|_iq < 1e-12 A  (INVESTIGATE < 1e-6 A)
+  Phase 2: deviation < 1e-10 (EXACT), < 1e-3 (INVESTIGATE), else HARD FAIL
+  Phase 3: P3 ranking per scenario must match P0 ground truth
+  Phase 4: sigma=0 (EXACT), sigma<=1e-10 (float noise/PASS), else FAIL
+
+Phase 0: MISSING
+
+Phase 1 — Correctness Probing (SC-1): PASS
+    step_low_speed_500rpm_2A: max|R1-R2|=0.00e+00 A  -> PASS (< 1e-12 A)
+    step_mid_speed_1500rpm_2A: max|R1-R2|=0.00e+00 A  -> PASS (< 1e-12 A)
+    step_high_speed_2500rpm_2A: max|R1-R2|=0.00e+00 A  -> PASS (< 1e-12 A)
+    multi_step_bidirectional_1500rpm: max|R1-R2|=0.00e+00 A  -> PASS (< 1e-12 A)
+    four_quadrant_transition_1500rpm: max|R1-R2|=0.00e+00 A  -> PASS (< 1e-12 A)
+    field_weakening_2500rpm: max|R1-R2|=0.00e+00 A  -> PASS (< 1e-12 A)
+
+Phase 2 — Metric Validation (SC-2): PASS
+  Scenario: step_mid_speed_1500rpm_2A, step onset: 0
+  Metric                    Deviation Verdict
+    MAE_i_q                    3.21e-17   EXACT (< 1e-10)
+    ITAE_i_q                   2.12e-07   INVESTIGATE (< 1e-3)
+    Settling_i_q                    N/A   N/A (nan)
+    Overshoot_i_q                   N/A   N/A (nan)
+
+Phase 3: MISSING
+
+Phase 4: MISSING
+
+
+======================================================================
+SUMMARY
+  P0: MISSING
+  P1: PASS
+  P2: PASS
+  P3: MISSING
+  P4: MISSING
+======================================================================

@@ -79,7 +79,7 @@ def plot_sigma_heatmap(results_dir: Path, plots_dir: Path) -> None:
 
     Rows = metrics, columns = scenarios.
     Cell values: actual σ across N repeats (0, float-noise e.g. 1e-16, or — for NaN).
-    σ < 1e-10 is deterministic (PASS); only σ > 1e-10 indicates non-determinism.
+    σ < 1e-10 is deterministic; only σ > 1e-10 indicates non-determinism.
     """
     sigma_path = results_dir / "phase4_sigma_table.json"
     if not sigma_path.exists():
@@ -106,7 +106,7 @@ def plot_sigma_heatmap(results_dir: Path, plots_dir: Path) -> None:
         for i, mk in enumerate(metrics):
             raw[i, j] = _raw_sigma(sigma_table[sn].get(mk))
 
-    # For color scale: treat sub-epsilon as 0; NaN as 0 so we can still decide "all pass"
+    # For color scale: treat sub-epsilon as 0; NaN as 0 so we can still decide "all deterministic"
     data = np.zeros((len(metrics), len(scenario_names)))
     for i in range(len(metrics)):
         for j in range(len(scenario_names)):
@@ -116,7 +116,7 @@ def plot_sigma_heatmap(results_dir: Path, plots_dir: Path) -> None:
             else:
                 data[i, j] = 0.0 if abs(v) < _EPSILON else v
 
-    all_pass = np.all(data == 0.0)  # all exact 0 or below epsilon
+    all_deterministic = np.all(data == 0.0)  # all exact 0 or below epsilon
     any_nonzero = np.any(data > 0.0)
 
     # --- Heatmap ---
@@ -149,7 +149,7 @@ def plot_sigma_heatmap(results_dir: Path, plots_dir: Path) -> None:
         for j in range(len(scenario_names)):
             v = raw[i, j]
             text = _cell_text(v)
-            # Contrast: dark text on light green when all pass; white/black when range varies
+            # Contrast: dark text on light green when all deterministic; white/black when range varies
             if not any_nonzero:
                 color = "darkgreen"
             else:
@@ -164,7 +164,7 @@ def plot_sigma_heatmap(results_dir: Path, plots_dir: Path) -> None:
     ax.set_yticks(np.arange(len(metrics)))
     ax.set_yticklabels([m.replace("_", " ") for m in metrics], fontsize=8)
 
-    verdict = "σ = 0 or < 1e-10 for all (deterministic, PASS)" if all_pass else "Non-zero σ detected — check GPU non-determinism"
+    verdict = "σ = 0 or < 1e-10 for all (deterministic)" if all_deterministic else "Non-zero σ detected — check GPU non-determinism"
     ax.set_title(
         f"Reproducibility — Per-Metric σ Across Repeats (R6–R8)\n{verdict}",
         fontweight="bold",
