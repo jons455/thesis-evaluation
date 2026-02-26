@@ -105,6 +105,7 @@ def run_phase5(
     port: int = 5000,
     timeout: float = 30.0,
     run_name: str | None = None,
+    output_dir: str | Path | None = None,
     seed: int = 42,
     quick: bool = True,
     error_gain: float = 10.0,
@@ -116,7 +117,11 @@ def run_phase5(
     from embark.benchmark.harness import QUICK_SCENARIOS, STANDARD_SCENARIOS, BenchmarkSuite
 
     scenarios = QUICK_SCENARIOS if quick else STANDARD_SCENARIOS
-    results_dir = ensure_results_dir("phase5_hil", run_name)
+    if output_dir is not None:
+        results_dir = Path(output_dir).resolve()
+        results_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        results_dir = ensure_results_dir("phase5_hil", run_name)
 
     print("=" * 70)
     print("  PVP Phase 5 — HIL Deployment Feasibility (SC-6)")
@@ -234,7 +239,8 @@ def main() -> int:
     parser.add_argument("--host", type=str, required=True, help="Akida board IP")
     parser.add_argument("--port", type=int, default=5000, help="Akida server port")
     parser.add_argument("--timeout", type=float, default=30.0, help="TCP timeout (s)")
-    parser.add_argument("--run", type=str, default=None, help="Run name for results directory")
+    parser.add_argument("--run", type=str, default=None, help="Run name for results directory (ignored if --output-dir is set)")
+    parser.add_argument("--output-dir", type=str, default=None, metavar="DIR", help="Save all Phase 5 outputs to this directory (e.g. thesis_final/phase5)")
     parser.add_argument("--seed", type=int, default=42, help="RNG seed")
     parser.add_argument("--quick", action="store_true", default=True, help="Use QUICK_SCENARIOS (default)")
     parser.add_argument("--full", action="store_true", help="Use STANDARD_SCENARIOS")
@@ -247,6 +253,7 @@ def main() -> int:
         port=args.port,
         timeout=args.timeout,
         run_name=args.run,
+        output_dir=args.output_dir,
         seed=args.seed,
         quick=not args.full,
         error_gain=args.error_gain,
