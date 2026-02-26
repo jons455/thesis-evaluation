@@ -19,6 +19,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -150,6 +151,48 @@ def _build_remote_akida_controller(args: argparse.Namespace):
     return controller
 
 
+def _run_one_scenario_trajectory(controller, scenario, pmsm_config) -> dict:
+    """Run one scenario step-by-step and return trajectory dict (t, i_q_ref, i_q, i_d_ref, i_d, u_q, u_d)."""
+    from embark.benchmark.physics.config import PMSMConfig
+
+    if pmsm_config is None:
+        pmsm_config = PMSMConfig()
+    task = scenario.create_task(physics_config=pmsm_config)
+    if hasattr(controller, "configure"):
+        controller.configure(task.physics_engine.config, task)
+    state, reference = task.reset()
+    controller.reset()
+
+    traj: dict[str, list[float]] = {
+        "t": [],
+        "i_q_ref": [],
+        "i_q": [],
+        "i_d_ref": [],
+        "i_d": [],
+        "u_q": [],
+        "u_d": [],
+    }
+    step = 0
+    done = False
+    dt = float(task.physics_engine.config.tau)
+    max_steps = scenario.max_steps if scenario.max_steps is not None else float("inf")
+
+    while not done and step < max_steps:
+        action = controller(state, reference)
+        next_state, next_ref, done = task.step(action)
+        traj["t"].append(step * dt)
+        traj["i_q_ref"].append(float(reference["i_q_ref"]))
+        traj["i_q"].append(float(next_state["i_q"]))
+        traj["i_d_ref"].append(float(reference["i_d_ref"]))
+        traj["i_d"].append(float(next_state["i_d"]))
+        traj["u_q"].append(float(action["v_q"]))
+        traj["u_d"].append(float(action["v_d"]))
+        state, reference = next_state, next_ref
+        step += 1
+
+    return traj
+
+
 def main() -> int:
     args = parse_args()
 
@@ -215,6 +258,19 @@ def main() -> int:
             out_path = results_dir / f"{args.controller_name}.json"
             suite.save_results(summary, out_path)
             print(f"  Saved: {out_path}", flush=True)
+
+        # Trajectory for one scenario (first in list) for HIL debugging / step-by-step comparison
+        if args.save_results and scenarios:
+            from embark.benchmark.physics.config import PMSMConfig
+
+            traj_scenario = scenarios[0]
+            print(f"  Capturing trajectory for: {traj_scenario.name} ...", flush=True)
+            pmsm_config = PMSMConfig()
+            traj = _run_one_scenario_trajectory(controller, traj_scenario, pmsm_config)
+            traj_path = results_dir / f"trajectory_{args.controller_name}_{traj_scenario.name}.json"
+            with open(traj_path, "w", encoding="utf-8") as f:
+                json.dump({k: [float(v) for v in vals] for k, vals in traj.items()}, f, indent=2)
+            print(f"  Saved: {traj_path}", flush=True)
 
         # If summary contains latency keys, print a short note
         if isinstance(summary, dict):
