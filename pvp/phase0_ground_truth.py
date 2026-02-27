@@ -3,7 +3,7 @@ PVP Phase 0 — Ground Truth Calibration.
 
 Establishes the MAE_q per model per scenario using the same BenchmarkSuite
 code path as Phase 3. This ensures Phase 0 and Phase 3 are directly comparable
-(no code-path mismatch between evaluate_rate_snn.py and the wrapper pipeline).
+(no code-path mismatch between embark-evaluation/scripts/evaluate_rate_snn.py and the wrapper pipeline).
 
 Runs: R0a (best), R0b (intermediate), R0c (poor) through STANDARD_SCENARIOS.
 Output: phase0_rankings.json — MAE_q per scenario per model.

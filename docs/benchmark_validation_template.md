@@ -927,7 +927,7 @@ jobs:
       - name: Run quick benchmark
         run: |
           poetry install
-          poetry run python -m evaluation.analysis.evaluate_rate_snn \
+          poetry run python embark-evaluation/scripts/evaluate_rate_snn.py \
             --model evaluation/trained_models/reference_model.pt \
             --quick \
             --compare-baseline results/baseline.json

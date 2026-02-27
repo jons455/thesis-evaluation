@@ -243,14 +243,14 @@ Using the checkpoints in this directory (run from repo root):
 
 ```bash
 # Full evaluation (10 runs × 2000 steps per scenario)
-poetry run python -m evaluation.analysis.evaluate_rate_snn \
+poetry run python embark-evaluation/scripts/evaluate_rate_snn.py \
   --model "embark-evaluation/models_for_evaluation/best_incremental_snn/model.pt" \
        "embark-evaluation/models_for_evaluation/intermediate_scheduled_sampling/model.pt" \
        "embark-evaluation/models_for_evaluation/poor_no_tanh/model.pt" \
   --plots-dir "embark-evaluation/models_for_evaluation/plots"
 
 # Quick evaluation (3 runs × 500 steps)
-poetry run python -m evaluation.analysis.evaluate_rate_snn \
+poetry run python embark-evaluation/scripts/evaluate_rate_snn.py \
   --model "embark-evaluation/models_for_evaluation/best_incremental_snn/model.pt" \
        "embark-evaluation/models_for_evaluation/intermediate_scheduled_sampling/model.pt" \
        "embark-evaluation/models_for_evaluation/poor_no_tanh/model.pt" \
@@ -267,5 +267,5 @@ Original paths (still valid): `evaluation/trained_models/v12/incremental/best_mo
 - **v12 Training:** [`notebooks/train_snn_v12.py`](../../notebooks/train_snn_v12.py)
 - **v10 Training:** [`notebooks/train_snn_v10.ipynb`](../../notebooks/train_snn_v10.ipynb)
 - **v9 Training:** [`notebooks/train_snn_v9.ipynb`](../../notebooks/train_snn_v9.ipynb)
-- **Evaluation Script:** [`evaluation/analysis/evaluate_rate_snn.py`](../../evaluation/analysis/evaluate_rate_snn.py)
+- **Evaluation Script:** [`embark-evaluation/scripts/evaluate_rate_snn.py`](../scripts/evaluate_rate_snn.py)
 - **Benchmark Interface:** [`docs/RATE_SNN_BENCHMARK_INTERFACE.md`](../RATE_SNN_BENCHMARK_INTERFACE.md)

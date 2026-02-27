@@ -25,8 +25,9 @@ EMBARK_EVAL_DIR = REPO_ROOT / "embark-evaluation"
 RESULTS_BASE = EMBARK_EVAL_DIR / "pvp" / "results"
 MODELS_DIR = EMBARK_EVAL_DIR / "models_for_evaluation"
 
-# Ensure repo root and embark-evaluation are on sys.path
-for _p in [str(REPO_ROOT), str(EMBARK_EVAL_DIR)]:
+# Ensure repo root, embark-evaluation, and scripts are on sys.path
+_scripts_dir = EMBARK_EVAL_DIR / "scripts"
+for _p in [str(REPO_ROOT), str(EMBARK_EVAL_DIR), str(_scripts_dir)]:
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
@@ -104,7 +105,7 @@ def build_snn_controller(
     """
     from embark.benchmark.adapters import TensorControllerAdapter
     from embark.benchmark.processors import RateSNNActionProcessor, RateSNNStateProcessor
-    from evaluation.analysis.evaluate_rate_snn import load_rate_model, resolve_feature_params
+    from evaluate_rate_snn import load_rate_model, resolve_feature_params
 
     checkpoint_path = get_model_path(spec)
     model, meta = load_rate_model(checkpoint_path, device=device)

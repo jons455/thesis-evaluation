@@ -25,10 +25,12 @@ from typing import Any
 
 import torch
 
-# Ensure repo-root modules (e.g. evaluation.*) are importable.
+# Ensure repo root and embark-evaluation/scripts are importable.
 _repo_root = Path(__file__).resolve().parents[1]
-if str(_repo_root) not in sys.path:
-    sys.path.insert(0, str(_repo_root))
+_scripts_dir = Path(__file__).resolve().parent / "scripts"
+for _p in (str(_repo_root), str(_scripts_dir)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 
 CHECKPOINT_PATTERN = re.compile(r"\*\*Checkpoint:\*\*\s*`([^`]+)`")
@@ -227,7 +229,7 @@ def _build_snn_controller(
 ):
     from embark.benchmark.adapters import TensorControllerAdapter
     from embark.benchmark.processors import RateSNNActionProcessor, RateSNNStateProcessor
-    from evaluation.analysis.evaluate_rate_snn import load_rate_model, resolve_feature_params
+    from evaluate_rate_snn import load_rate_model, resolve_feature_params
 
     model, meta = load_rate_model(checkpoint_path, device=device)
     n_max, error_gain = resolve_feature_params(meta, n_max_override, error_gain_override)
