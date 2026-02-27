@@ -11,6 +11,7 @@ Output: per-component timing breakdown table.
 Usage:
     poetry run python embark-evaluation/pvp/phase6_overhead.py
     poetry run python embark-evaluation/pvp/phase6_overhead.py --run pvp_run1
+    poetry run python embark-evaluation/pvp/phase6_overhead.py --run pvp_run_gpu --device cuda  # GPU inference timing
 """
 
 from __future__ import annotations
@@ -58,8 +59,9 @@ def run_phase6(
     run_name: str | None = None,
     seed: int = 42,
     quick: bool = False,
+    device: str = "cpu",
 ) -> dict:
-    """Execute Phase 6: overhead profiling."""
+    """Execute Phase 6: overhead profiling. device applies to SNN inference only (PI baseline is CPU)."""
     setup_deterministic(seed)
 
     from embark.benchmark.harness import QUICK_SCENARIOS, STANDARD_SCENARIOS, BenchmarkSuite
@@ -67,9 +69,11 @@ def run_phase6(
     scenarios = QUICK_SCENARIOS if quick else STANDARD_SCENARIOS
     results_dir = ensure_results_dir("phase6_overhead", run_name)
 
+    device_display = "CUDA" if device.startswith("cuda") else device.upper()
+
     print("=" * 70)
     print("  PVP Phase 6 — Overhead Profiling (SC-7)")
-    print(f"  Scenarios: {len(scenarios)}")
+    print(f"  Scenarios: {len(scenarios)}, SNN device: {device_display}")
     print("=" * 70)
 
     suite = BenchmarkSuite(scenarios=scenarios, verbose=False)
@@ -90,7 +94,7 @@ def run_phase6(
     # SNN models
     for spec in MODELS:
         print(f"\n  Profiling {spec.name}...")
-        controller, meta = build_snn_controller(spec, device="cpu")
+        controller, meta = build_snn_controller(spec, device=device)
         result = _profile_controller(controller, suite, spec.name)
         timing_results.append(result)
         total_wall += result["wall_time_s"]
@@ -104,6 +108,7 @@ def run_phase6(
         "PVP Phase 6 — Overhead Profiling",
         f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         f"Mode: {'QUICK' if quick else 'STANDARD'}",
+        f"SNN device: {device_display} (PI baseline always CPU)",
         "",
         f"{'Controller':<40s} {'Wall Time':>12s} {'Steps':>8s} {'us/step':>10s}",
         "-" * 72,
@@ -135,7 +140,12 @@ def run_phase6(
     print(f"  SC-7: {'PASS' if feasible else 'FAIL'}")
 
     save_json(
-        {"timing": timing_results, "total_wall_s": total_wall, "feasible": feasible},
+        {
+            "timing": timing_results,
+            "total_wall_s": total_wall,
+            "feasible": feasible,
+            "snn_device": device_display,
+        },
         results_dir / "phase6_timing.json",
     )
     save_text_report(report_lines, results_dir / "phase6_report.txt")
@@ -148,9 +158,21 @@ def main() -> int:
     parser.add_argument("--run", type=str, default=None, help="Run name for results directory")
     parser.add_argument("--seed", type=int, default=42, help="RNG seed")
     parser.add_argument("--quick", action="store_true", help="Use QUICK_SCENARIOS")
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cpu",
+        choices=["cpu", "cuda"],
+        help="Device for SNN inference (PI baseline always CPU); use cuda for GPU timing/feasibility",
+    )
     args = parser.parse_args()
 
-    run_phase6(run_name=args.run, seed=args.seed, quick=args.quick)
+    run_phase6(
+        run_name=args.run,
+        seed=args.seed,
+        quick=args.quick,
+        device=args.device,
+    )
     return 0
 
 

@@ -20,6 +20,7 @@ Usage:
     poetry run python embark-evaluation/pvp/run_all_phases.py --run pvp_run1
     poetry run python embark-evaluation/pvp/run_all_phases.py --run pvp_run1 --quick
     poetry run python embark-evaluation/pvp/run_all_phases.py --run pvp_run1 --hil-host 10.42.0.1
+    poetry run python embark-evaluation/pvp/run_all_phases.py --run pvp_gpu --phase4-device cuda --phase6-device cuda  # Phase 4+6 on GPU
 """
 
 from __future__ import annotations
@@ -54,6 +55,20 @@ def main() -> int:
     parser.add_argument("--hil-host", type=str, default=None, help="Akida board IP for Phase 5")
     parser.add_argument("--hil-port", type=int, default=5000, help="Akida server port")
     parser.add_argument(
+        "--phase4-device",
+        type=str,
+        default="cpu",
+        choices=["cpu", "cuda"],
+        help="Device for Phase 4 (cpu = deterministic; cuda = report bounded σ per SC-4)",
+    )
+    parser.add_argument(
+        "--phase6-device",
+        type=str,
+        default="cpu",
+        choices=["cpu", "cuda"],
+        help="Device for Phase 6 SNN inference (cuda = GPU timing/feasibility; PI baseline always CPU)",
+    )
+    parser.add_argument(
         "--skip",
         type=str,
         nargs="*",
@@ -72,6 +87,7 @@ def main() -> int:
     print(f"  Mode: {'QUICK' if args.quick else 'STANDARD'}")
     print(f"  HIL: {'Yes (' + args.hil_host + ')' if args.hil_host else 'No (Phase 5 skipped)'}")
     print(f"  Skip: {skip_phases if skip_phases else 'None'}")
+    print(f"  Phase 4 device: {args.phase4_device}  Phase 6 device: {args.phase6_device}")
     print("=" * 70)
 
     results_summary: dict[str, dict] = {}
@@ -179,7 +195,12 @@ def main() -> int:
             from pvp.phase4_reproducibility import run_phase4
 
             t0 = time.perf_counter()
-            result = run_phase4(run_name=run_name, seed=args.seed, quick=args.quick)
+            result = run_phase4(
+                run_name=run_name,
+                seed=args.seed,
+                quick=args.quick,
+                device=args.phase4_device,
+            )
             phase_times["phase4"] = time.perf_counter() - t0
             results_summary["phase4"] = {
                 "status": "completed",
@@ -234,7 +255,12 @@ def main() -> int:
             from pvp.phase6_overhead import run_phase6
 
             t0 = time.perf_counter()
-            result = run_phase6(run_name=run_name, seed=args.seed, quick=args.quick)
+            result = run_phase6(
+                run_name=run_name,
+                seed=args.seed,
+                quick=args.quick,
+                device=args.phase6_device,
+            )
             phase_times["phase6"] = time.perf_counter() - t0
             results_summary["phase6"] = {
                 "status": "completed",

@@ -20,6 +20,7 @@ Notes on sigma values:
 Usage:
     poetry run python embark-evaluation/pvp/phase4_reproducibility.py
     poetry run python embark-evaluation/pvp/phase4_reproducibility.py --run pvp_run1
+    poetry run python embark-evaluation/pvp/phase4_reproducibility.py --run pvp_run4_gpu --device cuda
 """
 
 from __future__ import annotations
@@ -65,6 +66,7 @@ def run_phase4(
     seed: int = 42,
     n_repeats: int = 3,
     quick: bool = False,
+    device: str = "cpu",
 ) -> dict:
     """Execute Phase 4: reproducibility validation.
 
@@ -83,10 +85,13 @@ def run_phase4(
     # Always test with the best (most complex) model
     best_spec = [m for m in MODELS if m.quality == "best"][0]
 
+    # Normalize device for display (e.g. cuda:0 -> CUDA)
+    device_display = "CUDA" if device.startswith("cuda") else device.upper()
+
     print("=" * 70)
     print("  PVP Phase 4 — Reproducibility (SC-4)")
     print(f"  Model: {best_spec.name}")
-    print(f"  Repeats: {n_repeats}, Scenarios: {len(scenarios)}")
+    print(f"  Repeats: {n_repeats}, Scenarios: {len(scenarios)}, Device: {device_display}")
     print("=" * 70)
 
     suite = BenchmarkSuite(scenarios=scenarios, verbose=False)
@@ -101,7 +106,7 @@ def run_phase4(
         # Full deterministic reset before each repeat
         setup_deterministic(seed)
 
-        controller, meta = build_snn_controller(best_spec, device="cpu")
+        controller, meta = build_snn_controller(best_spec, device=device)
         t0 = time.perf_counter()
         summary = suite.run(controller=controller, name=f"{best_spec.name}_r{repeat}", quiet=True)
         elapsed = time.perf_counter() - t0
@@ -132,7 +137,7 @@ def run_phase4(
         "PVP Phase 4 — Reproducibility",
         f"Model: {best_spec.name}",
         f"Repeats: {n_repeats}, Seed: {seed}",
-        f"Device: CPU",
+        f"Device: {device_display}",
         f"Python: {platform.python_version()}",
         f"PyTorch: {torch.__version__}",
         f"OS: {platform.system()} {platform.release()}",
@@ -206,9 +211,22 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=42, help="RNG seed")
     parser.add_argument("--n-repeats", type=int, default=3, help="Number of repeats")
     parser.add_argument("--quick", action="store_true", help="Use QUICK_SCENARIOS")
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cpu",
+        choices=["cpu", "cuda"],
+        help="Device for SNN inference (cpu = deterministic σ=0; cuda = report bounded σ per SC-4)",
+    )
     args = parser.parse_args()
 
-    run_phase4(run_name=args.run, seed=args.seed, n_repeats=args.n_repeats, quick=args.quick)
+    run_phase4(
+        run_name=args.run,
+        seed=args.seed,
+        n_repeats=args.n_repeats,
+        quick=args.quick,
+        device=args.device,
+    )
     return 0
 
 
