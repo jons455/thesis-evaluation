@@ -173,7 +173,7 @@ def plot_sigma_heatmap(results_dir: Path, plots_dir: Path) -> None:
 
     plt.tight_layout()
     out = plots_dir / "p4_1_sigma_heatmap.png"
-    fig.savefig(out, bbox_inches="tight", dpi=200)
+    fig.savefig(out, bbox_inches="tight", dpi=300)
     plt.close(fig)
     print(f"  Saved: {out.name}")
 
@@ -228,7 +228,7 @@ def plot_repeat_deviation_bars(results_dir: Path, plots_dir: Path) -> None:
 
     plt.tight_layout()
     out = plots_dir / "p4_2_repeat_deviation_bars.png"
-    fig.savefig(out, bbox_inches="tight", dpi=200)
+    fig.savefig(out, bbox_inches="tight", dpi=300)
     plt.close(fig)
     print(f"  Saved: {out.name}")
 

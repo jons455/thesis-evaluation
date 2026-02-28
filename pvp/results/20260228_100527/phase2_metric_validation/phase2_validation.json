@@ -1,0 +1,111 @@
+{
+  "scenario": "step_mid_speed_1500rpm_2A",
+  "step_onset": 0,
+  "pre_step_ref": 0.0,
+  "comparisons": [
+    {
+      "metric": "MAE_i_q",
+      "manual": 0.0077175582369421875,
+      "pipeline": 0.007717558236942155,
+      "deviation": 3.209238430557093e-17
+    },
+    {
+      "metric": "MAE_i_d",
+      "manual": 0.001497669510795572,
+      "pipeline": 0.0014976695107955715,
+      "deviation": 4.336808689942018e-19
+    },
+    {
+      "metric": "ITAE_i_q",
+      "manual": 5.185062920917938e-06,
+      "pipeline": 5.396583155812556e-06,
+      "deviation": 2.1152023489461834e-07
+    },
+    {
+      "metric": "Settling_i_q",
+      "manual": 0.0078000000000000005,
+      "pipeline": 0.007900000000000008,
+      "deviation": 0.0001000000000000072
+    },
+    {
+      "metric": "Overshoot_i_q",
+      "manual": 117.54716456787877,
+      "pipeline": 117.54716456787877,
+      "deviation": 0.0
+    },
+    {
+      "metric": "RMS_i_q_steady_state",
+      "manual": 3.058365268422117e-07,
+      "pipeline": 3.058312406899512e-07,
+      "deviation": 5.286152260482888e-12
+    },
+    {
+      "metric": "RMS_i_d_steady_state",
+      "manual": 3.6638399534802473e-07,
+      "pipeline": 3.664148247205469e-07,
+      "deviation": 3.082937252214924e-11
+    }
+  ],
+  "pipeline_metrics": {
+    "steps": 3000,
+    "mae_i_q": 0.007717558236942155,
+    "mae_i_d": 0.0014976695107955715,
+    "itae_i_q": 5.396583155812556e-06,
+    "itae_i_d": 6.639184270804094e-07,
+    "multi_step_itae_i_q_global": 5.407603634750221e-06,
+    "multi_step_itae_i_q_num_steps": 1.0,
+    "multi_step_itae_i_q_per_step_mean": 5.407603634750221e-06,
+    "multi_step_itae_i_q_per_step_worst": 5.407603634750221e-06,
+    "multi_step_itae_i_q_per_step_std": 0.0,
+    "multi_step_itae_i_d_global": 6.761513269569614e-07,
+    "multi_step_itae_i_d_num_steps": 1.0,
+    "multi_step_itae_i_d_per_step_mean": 6.761513269569614e-07,
+    "multi_step_itae_i_d_per_step_worst": 6.761513269569614e-07,
+    "multi_step_itae_i_d_per_step_std": 0.0,
+    "max_error_i_q": 2.3509432913575754,
+    "max_error_i_d": 0.6931812813664949,
+    "settling_time_i_q": 0.007900000000000008,
+    "overshoot": 117.54716456787877,
+    "multi_step_settling_time_i_q_worst": 0.007900000000000008,
+    "multi_step_settling_time_i_q_mean": 0.007900000000000008,
+    "multi_step_settling_time_i_q_std": 0.0,
+    "multi_step_settling_time_i_q_num_steps": 1.0,
+    "multi_step_settling_time_i_q_num_settled": 1.0,
+    "multi_step_overshoot_i_q_worst": 117.54716456787877,
+    "multi_step_overshoot_i_q_mean": 117.54716456787877,
+    "multi_step_overshoot_i_q_std": 0.0,
+    "multi_step_overshoot_i_q_num_steps": 1.0,
+    "rms_i_q": 3.058312406899512e-07,
+    "rms_i_d": 3.664148247205469e-07,
+    "multi_step_rms_i_q_global": 0.07415891350911843,
+    "multi_step_rms_i_q_num_steps": 1.0,
+    "multi_step_rms_i_q_per_step_mean": 0.07415891350911843,
+    "multi_step_rms_i_q_per_step_worst": 0.07415891350911843,
+    "multi_step_rms_i_q_per_step_std": 0.0,
+    "multi_step_rms_i_d_global": 0.01977108316980361,
+    "multi_step_rms_i_d_num_steps": 1.0,
+    "multi_step_rms_i_d_per_step_mean": 0.01977108316980361,
+    "multi_step_rms_i_d_per_step_worst": 0.01977108316980361,
+    "multi_step_rms_i_d_per_step_std": 0.0,
+    "mean_latency_ms": 0.0,
+    "p95_latency_ms": 0.0,
+    "p99_latency_ms": 0.0,
+    "max_latency_ms": 0.0,
+    "jitter_ms": 0.0,
+    "total_inference_time_s": 0.0,
+    "chip_mean_us": 0.0,
+    "chip_median_us": 0.0,
+    "chip_p95_us": 0.0,
+    "chip_p99_us": 0.0,
+    "chip_max_us": 0.0,
+    "chip_min_us": 0.0,
+    "total_spikes": 0.0,
+    "spikes_per_step": 0.0,
+    "total_syops": 0.0,
+    "syops_per_step": 0.0,
+    "mean_sparsity": 0.0,
+    "min_sparsity": 0.0,
+    "max_sparsity": 0.0
+  },
+  "manual_mae_next_state": 0.0070508916052912434
+}

@@ -136,7 +136,7 @@ def plot_latency_waterfall(results_dir: Path, plots_dir: Path) -> None:
 
     plt.tight_layout()
     out = plots_dir / "p5_1_latency_waterfall.png"
-    fig.savefig(out, bbox_inches="tight", dpi=200)
+    fig.savefig(out, bbox_inches="tight", dpi=300)
     plt.close(fig)
     print(f"  Saved: {out.name}")
 
@@ -225,47 +225,9 @@ def plot_sc6a_tolerance_comparison(results_dir: Path, plots_dir: Path) -> None:
             cell.set_facecolor("white")
     plt.tight_layout()
     out_table = plots_dir / "p5_2_repeatability_table.png"
-    fig_table.savefig(out_table, bbox_inches="tight", dpi=200)
+    fig_table.savefig(out_table, bbox_inches="tight", dpi=300)
     plt.close(fig_table)
     print(f"  Saved: {out_table.name}")
-
-    # ─── 2) Bar chart with x-axis zoomed to data (so small deviations are visible) ───
-    labels = [f"{r[0]}\n({r[1]})" for r in rows]
-    norms = [r[7] for r in rows]
-    within_tols = [r[6] for r in rows]
-    # Bar width: at least a small visible amount for zero
-    display_vals = [max(n, 0.003) for n in norms]
-
-    y = np.arange(len(labels))
-    colors = [_COLOR_WITHIN if w else _COLOR_OUTSIDE for w in within_tols]
-
-    fig, ax = plt.subplots(figsize=(8, max(3.5, 0.45 * len(labels))))
-    ax.barh(y, display_vals, color=colors, alpha=0.85, edgecolor="gray", linewidth=0.5)
-
-    max_norm = max(norms)
-    if max_norm <= 0:
-        x_max = 0.05
-    elif max_norm < 0.15:
-        x_max = max(0.08, max_norm * 2.0)
-    elif max_norm < 1.0:
-        x_max = min(1.2, max_norm * 1.3)
-    else:
-        x_max = max(1.2, max_norm * 1.1)
-    ax.set_xlim(0, x_max)
-    if x_max <= 1.5:
-        ax.axvline(1.0, color=_COLOR_REF, ls="--", lw=1.5, alpha=0.8, label="Tolerance (1.0)")
-    ax.set_yticks(y)
-    ax.set_yticklabels(labels, fontsize=7)
-    ax.set_xlabel("Deviation / tolerance (normalized)")
-    ax.legend(fontsize=8)
-    ax.grid(alpha=0.3, axis="x")
-    ax.invert_yaxis()
-
-    plt.tight_layout()
-    out_bars = plots_dir / "p5_2_sc6a_tolerance_comparison.png"
-    fig.savefig(out_bars, bbox_inches="tight", dpi=200)
-    plt.close(fig)
-    print(f"  Saved: {out_bars.name}")
 
 
 def generate_phase5_plots(results_dir: Path, plots_dir: Path) -> None:

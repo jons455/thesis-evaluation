@@ -58,7 +58,7 @@ def plot_trajectory_overlay(results_dir: Path, plots_dir: Path) -> None:
 
         plt.tight_layout()
         out = plots_dir / f"p1_1_trajectory_overlay_{scenario}.png"
-        fig.savefig(out, bbox_inches="tight", dpi=200)
+        fig.savefig(out, bbox_inches="tight", dpi=300)
         plt.close(fig)
         print(f"  Saved: {out.name}")
 
@@ -99,7 +99,7 @@ def plot_residual_trace(results_dir: Path, plots_dir: Path) -> None:
     fig.suptitle("SC-1 Residual Trace — PI Native vs. PI Wrapper", fontweight="bold", y=1.01)
     plt.tight_layout()
     out = plots_dir / "p1_2_residual_trace.png"
-    fig.savefig(out, bbox_inches="tight", dpi=200)
+    fig.savefig(out, bbox_inches="tight", dpi=300)
     plt.close(fig)
     print(f"  Saved: {out.name}")
 

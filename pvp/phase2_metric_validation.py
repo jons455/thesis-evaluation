@@ -16,6 +16,14 @@ All interpretation is done in interpret_results.py.
 
 Step onset: first sample k where |i_q_ref[k] - i_q_ref[k-1]| > 0.01 A.
 
+Steady-state RMS: RMS of tracking error over the window from t >= steady_state_start_s
+(default 0.05 s) to end of episode, i.e. sqrt(mean((i - i_ref)^2)) in that window.
+Validates that the pipeline's rms_i_q / rms_i_d (if defined as steady-state) are correct.
+
+Settling and overshoot are defined for the axis that has the step (i_q for step_*_2A
+scenarios where i_d_ref = 0). For scenarios with i_d_ref steps, the same formulas
+apply to i_d; the pipeline currently reports settling_time_i_q and overshoot (i_q) only.
+
 Usage:
     poetry run python embark-evaluation/pvp/phase2_metric_validation.py
     poetry run python embark-evaluation/pvp/phase2_metric_validation.py --run pvp_run1
@@ -53,6 +61,23 @@ def _find_step_onset(i_q_ref: np.ndarray, threshold: float = 0.01) -> int:
     return 0
 
 
+def _get_step_onset_and_pre_ref(
+    i_q_ref: np.ndarray, threshold: float = 0.01
+) -> tuple[int, float]:
+    """
+    Return (step_onset_index, pre_step_ref_value) for settling/overshoot.
+
+    If the reference never changes in the trajectory (step at t=0 before first sample),
+    step_onset is 0 and we assume pre_step_ref = 0 so step_size = |i_q_ref[0]|.
+    """
+    step_onset = _find_step_onset(i_q_ref, threshold)
+    if step_onset == 0:
+        if len(i_q_ref) > 0 and abs(i_q_ref[0]) > threshold:
+            return 0, 0.0  # step at start: assume 0 -> ref[0]
+        return 0, float("nan")  # no step detected
+    return step_onset, float(i_q_ref[step_onset - 1])
+
+
 def _manual_mae(i_q: np.ndarray, i_q_ref: np.ndarray) -> float:
     """Full-episode MAE: mean(|i_q_ref - i_q|). Use i_q aligned with pipeline (see below)."""
     return float(np.mean(np.abs(i_q_ref - i_q)))
@@ -83,6 +108,7 @@ def _manual_settling_time(
     i_q_ref: np.ndarray,
     dt: float,
     step_onset: int,
+    pre_step_ref: float,
     band_fraction: float = 0.02,
     dwell_s: float = 0.001,
 ) -> float:
@@ -90,11 +116,15 @@ def _manual_settling_time(
     Settling time: time from step onset to when error enters and stays in band.
 
     Band = band_fraction * |step_size|. Must stay in band for dwell_s.
+    pre_step_ref: reference value before the step (use when step at index 0).
     """
     if step_onset >= len(i_q_ref) - 1:
         return float("inf")
+    if np.isnan(pre_step_ref):
+        return float("nan")
 
-    step_size = abs(i_q_ref[step_onset] - i_q_ref[max(0, step_onset - 1)])
+    target = i_q_ref[step_onset]
+    step_size = abs(target - pre_step_ref)
     if step_size < 1e-12:
         return float("nan")
 
@@ -102,7 +132,6 @@ def _manual_settling_time(
     dwell_steps = max(1, int(dwell_s / dt))
 
     # Scan backward from end to find last violation
-    target = i_q_ref[step_onset]
     last_violation = step_onset - 1
     for k in range(len(i_q) - 1, step_onset - 1, -1):
         if abs(i_q[k] - target) > band:
@@ -121,42 +150,52 @@ def _manual_settling_time(
 
 
 def _manual_overshoot(
-    i_q: np.ndarray,
+    i_q_at_step_start: np.ndarray,
     i_q_ref: np.ndarray,
     step_onset: int,
-    smoothing_window: int = 5,
+    pre_step_ref: float,
 ) -> float:
     """
-    Overshoot as percentage of step size.
+    Overshoot (%) aligned with pipeline (embark.benchmark.metrics.accumulators.dynamics.Overshoot).
 
-    Uses 5-sample smoothed peak detection from step onset onward.
+    Pipeline: latches first non-zero ref as step_ref; tracks max(meas) or min(meas) of *state*
+    at each update (state at step start); overshoot = (peak - step_ref) / |step_ref| * 100
+    (or (step_ref - trough) / |step_ref| * 100 for negative step). No smoothing.
     """
-    if step_onset >= len(i_q):
+    if step_onset >= len(i_q_at_step_start):
         return 0.0
-
-    target = i_q_ref[step_onset]
-    pre_target = i_q_ref[max(0, step_onset - 1)]
-    step_size = target - pre_target
-
-    if abs(step_size) < 1e-12:
+    if np.isnan(pre_step_ref):
         return float("nan")
 
-    # Smooth the signal
-    segment = i_q[step_onset:]
-    if len(segment) < smoothing_window:
-        smoothed = segment
-    else:
-        kernel = np.ones(smoothing_window) / smoothing_window
-        smoothed = np.convolve(segment, kernel, mode="valid")
+    step_ref = i_q_ref[step_onset]
+    if abs(step_ref) < 1e-12:
+        return float("nan")
 
-    if step_size > 0:
-        peak = float(np.max(smoothed))
-        overshoot = max(0.0, (peak - target) / abs(step_size) * 100.0)
+    segment = i_q_at_step_start[step_onset:]
+    if step_ref > 0.0:
+        peak = float(np.max(segment))
+        return max(0.0, (peak - step_ref) / abs(step_ref) * 100.0)
     else:
-        peak = float(np.min(smoothed))
-        overshoot = max(0.0, (target - peak) / abs(step_size) * 100.0)
+        trough = float(np.min(segment))
+        return max(0.0, (step_ref - trough) / abs(step_ref) * 100.0)
 
-    return overshoot
+
+def _manual_rms_steady_state(
+    i: np.ndarray,
+    i_ref: np.ndarray,
+    dt: float,
+    start_s: float = 0.05,
+) -> float:
+    """
+    Steady-state RMS of tracking error: sqrt(mean((i - i_ref)^2)) over samples from
+    t >= start_s to end of episode. Matches documentation that RMS is "steady-state
+    only (after 50 ms)".
+    """
+    start_k = max(0, int(start_s / dt))
+    if start_k >= len(i):
+        return float("nan")
+    err = i[start_k:] - i_ref[start_k:]
+    return float(np.sqrt(np.mean(err * err)))
 
 
 def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
@@ -208,6 +247,7 @@ def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
         "i_q_at_step_start": [],  # state["i_q"] at start of step (pipeline alignment)
         "i_d": [],
         "i_d_ref": [],
+        "i_d_at_step_start": [],  # state["i_d"] at start of step (pipeline alignment)
         "u_q": [],
         "u_d": [],
     }
@@ -217,6 +257,7 @@ def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
     while not done and step < target_scenario.max_steps:
         # Pipeline metrics receive (state, reference, ...); they typically use ref vs state.
         trajectory["i_q_at_step_start"].append(float(state["i_q"]))
+        trajectory["i_d_at_step_start"].append(float(state["i_d"]))
 
         action = controller(state, reference)
         controller_info = getattr(controller, "last_info", None)
@@ -248,22 +289,29 @@ def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
     i_q = np.array(trajectory["i_q"])  # next_state["i_q"] after each step
     i_q_at_step_start = np.array(trajectory["i_q_at_step_start"])  # state["i_q"] at step start
     i_q_ref = np.array(trajectory["i_q_ref"])
-    step_onset = _find_step_onset(i_q_ref)
+    i_d = np.array(trajectory["i_d"])
+    i_d_at_step_start = np.array(trajectory["i_d_at_step_start"])
+    i_d_ref = np.array(trajectory["i_d_ref"])
+    step_onset, pre_step_ref = _get_step_onset_and_pre_ref(i_q_ref)
 
     # Pipeline TrackingMAE uses (reference, state) at each update, i.e. ref_t vs state_t.
     # So we use state at step start for MAE to match pipeline; otherwise deviation ~6e-4.
     manual_mae = _manual_mae(i_q_at_step_start, i_q_ref)
     manual_mae_next = _manual_mae(i_q, i_q_ref)  # kept for diagnostics
+    manual_mae_d = _manual_mae(i_d_at_step_start, i_d_ref)
     manual_itae = _manual_itae(i_q, i_q_ref, dt, step_onset)
-    manual_settling = _manual_settling_time(i_q, i_q_ref, dt, step_onset)
-    manual_overshoot = _manual_overshoot(i_q, i_q_ref, step_onset)
+    manual_settling = _manual_settling_time(i_q, i_q_ref, dt, step_onset, pre_step_ref)
+    manual_overshoot = _manual_overshoot(i_q_at_step_start, i_q_ref, step_onset, pre_step_ref)
+    # Steady-state RMS (from t >= 50 ms to end); pipeline may use same or full-episode.
+    manual_rms_q_ss = _manual_rms_steady_state(i_q, i_q_ref, dt)
+    manual_rms_d_ss = _manual_rms_steady_state(i_d, i_d_ref, dt)
 
     # Collect comparisons (raw data, no verdicts)
     comparisons: list[dict[str, Any]] = []
     report_lines: list[str] = [
         "PVP Phase 2 — Metric Validation",
         f"Scenario: {target_scenario.name}",
-        f"Step onset index: {step_onset}",
+        f"Step onset index: {step_onset}, pre_step_ref: {pre_step_ref}",
         f"Steps: {step}, dt: {dt}",
         f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
@@ -273,9 +321,12 @@ def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
 
     metric_pairs = [
         ("MAE_i_q", manual_mae, pipeline_results.get("mae_i_q", float("nan"))),
+        ("MAE_i_d", manual_mae_d, pipeline_results.get("mae_i_d", float("nan"))),
         ("ITAE_i_q", manual_itae, pipeline_results.get("itae_i_q", float("nan"))),
         ("Settling_i_q", manual_settling, pipeline_results.get("settling_time_i_q", float("nan"))),
         ("Overshoot_i_q", manual_overshoot, pipeline_results.get("overshoot", float("nan"))),
+        ("RMS_i_q_steady_state", manual_rms_q_ss, pipeline_results.get("rms_i_q", float("nan"))),
+        ("RMS_i_d_steady_state", manual_rms_d_ss, pipeline_results.get("rms_i_d", float("nan"))),
     ]
 
     for name, manual_val, pipeline_val in metric_pairs:
@@ -303,13 +354,37 @@ def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
     report_lines.append("(No pass/fail verdicts — see interpret_results.py)")
 
     # Save (include manual_mae_next for diagnostics: MAE using next_state vs ref)
+    def _json_float(v: float):
+        """Convert non-finite floats to None for JSON serialisation."""
+        if isinstance(v, float) and (np.isnan(v) or np.isinf(v)):
+            return None
+        return v
+
     save_json(
         {
             "scenario": target_scenario.name,
             "step_onset": step_onset,
+            "pre_step_ref": pre_step_ref if not np.isnan(pre_step_ref) else None,
+            "dt": dt,
             "comparisons": comparisons,
             "pipeline_metrics": pipeline_results,
             "manual_mae_next_state": manual_mae_next,
+            # Raw trajectory for Plot 2.4 (step response timeseries).
+            # i_q_at_step_start[k] = state["i_q"] at start of step k (t = k*dt).
+            # i_q[k]              = next_state["i_q"] after step k (t = (k+1)*dt).
+            # i_q_ref[k]          = reference during step k.
+            "trajectory": {
+                "i_q": trajectory["i_q"],
+                "i_q_ref": trajectory["i_q_ref"],
+                "i_q_at_step_start": trajectory["i_q_at_step_start"],
+            },
+            # Manual scalar metrics needed for plot annotations.
+            "manual_metrics": {
+                "settling_time_i_q": _json_float(manual_settling),
+                "overshoot_i_q": _json_float(manual_overshoot),
+                "itae_i_q": _json_float(manual_itae),
+                "mae_i_q": _json_float(manual_mae),
+            },
         },
         results_dir / "phase2_validation.json",
     )
