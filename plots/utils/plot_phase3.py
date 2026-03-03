@@ -4,6 +4,7 @@ Phase 3 Plots — Discriminative Power.
 Plot 3.1: Envelope comparison — each SNN vs PI baseline (1 figure per SNN).
 Plot 3.2: MAE grouped bar chart, log scale — PI + all 3 SNNs.
 Plot 3.4: SyOps vs MAE Pareto scatter — PI + all 3 SNNs.
+Plot 3.5: Neuromorphic metrics bar chart — SNN models only (SyOps, Sparsity, Spikes).
 Plot V1:  All models — all key metrics, normalized.
 Plot V2:  Log-ratio — log10(MAE / MAE_PI) — all 3 SNNs.
 """
@@ -254,34 +255,40 @@ def plot_syops_vs_mae_pareto(results_dir: Path, plots_dir: Path) -> None:
 
     fig, ax = plt.subplots(figsize=(7, 5))
 
+    points = []  # collect (x, y, label, color) for label placement
     for model in MODEL_ORDER:
         if model not in mae_table or model not in syops_table:
             continue
-        mae_vals = [v for v in mae_table[model].values() if v is not None and not np.isnan(v)]
+        mae_vals  = [v for v in mae_table[model].values()   if v is not None and not np.isnan(v)]
         syops_vals = [v for v in syops_table[model].values() if v is not None and not np.isnan(v)]
 
         if not mae_vals or not syops_vals:
             continue
 
-        avg_mae = np.mean(mae_vals)
+        avg_mae   = np.mean(mae_vals)
         avg_syops = np.mean(syops_vals)
         style = _get_style(model)
-        ax.scatter(avg_mae, avg_syops, s=120, color=style["color"],
-                   marker=style["marker"], label=style["label"], zorder=5, edgecolors="black", linewidths=0.5)
+        ax.scatter(avg_mae, avg_syops, s=90, color=style["color"],
+                   marker="o", zorder=5, edgecolors="black", linewidths=0.5)
+        points.append((avg_mae, avg_syops, style["label"], style["color"]))
+
+    # Annotate each point directly — no legend needed
+    for x_pt, y_pt, label, color in points:
+        ax.annotate(
+            label,
+            xy=(x_pt, y_pt),
+            xytext=(6, 4),
+            textcoords="offset points",
+            fontsize=8,
+            color=color,
+            fontweight="bold",
+        )
 
     ax.set_xlabel("Mean MAE $i_q$ [A]")
     ax.set_ylabel("Mean SyOps per Episode")
-    ax.legend(
-        fontsize=9,
-        loc="center left",
-        bbox_to_anchor=(1.02, 0.5),
-        frameon=True,
-        framealpha=0.95,
-        edgecolor="#ccc",
-    )
     ax.grid(alpha=0.3)
 
-    plt.tight_layout(rect=[0, 0, 0.85, 1])
+    plt.tight_layout()
     out = plots_dir / "p3_4_syops_vs_mae_pareto.png"
     fig.savefig(out, bbox_inches="tight", dpi=300)
     plt.close(fig)
@@ -530,6 +537,98 @@ def plot_log_ratio_mae(results_dir: Path, plots_dir: Path) -> None:
 
 
 
+# ──────────────────────────────────────────────────────────────────────
+# Plot 3.5: Neuromorphic metrics bar chart — SNN models only
+# ──────────────────────────────────────────────────────────────────────
+
+# Shorter x-tick labels so bars don't need wide subplots
+_SNN_SHORT_LABEL = {
+    "best_incremental_snn":            "best_incr.",
+    "intermediate_scheduled_sampling": "intermediate",
+    "poor_no_tanh":                    "poor_no_tanh",
+}
+
+
+def plot_neuromorphic_metrics_bar(results_dir: Path, plots_dir: Path) -> None:
+    """Plot 3.5 — Neuromorphic efficiency metrics (SNN models only).
+
+    Three subplots side-by-side:
+      - Total SyOps       (mean across scenarios)
+      - Mean Sparsity     (mean across scenarios, 0=dense, 1=fully silent)
+      - Total Spikes      (mean across scenarios)
+
+    PI baseline is excluded — it produces no spikes.
+    Values are averaged across all evaluation scenarios for a single
+    per-model summary bar.
+    """
+    summ_path = results_dir / "phase3_summaries.json"
+    if not summ_path.exists():
+        print("  [skip] phase3_summaries.json not found for Plot 3.5")
+        return
+
+    summaries = _load_json(summ_path)
+    snn_models = [m for m in SNN_MODELS if m in summaries]
+    if not snn_models:
+        print("  [skip] No SNN models in summaries for Plot 3.5")
+        return
+
+    neuro_defs = [
+        ("total_syops",   "Total SyOps\n(mean across scenarios)"),
+        ("mean_sparsity", "Mean Sparsity\n(mean across scenarios)"),
+        ("total_spikes",  "Total Spikes\n(mean across scenarios)"),
+    ]
+
+    # Average each neuromorphic metric across scenarios for every SNN model
+    avgs: dict[str, dict[str, float]] = {}
+    for metric_key, _ in neuro_defs:
+        tbl = _extract_metric_table(summaries, metric_key)
+        avgs[metric_key] = {}
+        for model in snn_models:
+            vals = [v for v in tbl.get(model, {}).values()
+                    if v is not None and not np.isnan(v)]
+            avgs[metric_key][model] = np.mean(vals) if vals else float("nan")
+
+    x = np.arange(len(snn_models))
+    w = 0.50
+
+    fig, axes = plt.subplots(1, len(neuro_defs), figsize=(11, 4))
+
+    for ax, (metric_key, ylabel) in zip(axes, neuro_defs):
+        for i, model in enumerate(snn_models):
+            style = _get_style(model)
+            val = avgs[metric_key][model]
+            ax.bar(i, val, w, color=style["color"], alpha=0.85,
+                   label=style["label"], zorder=3)
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(
+            [_SNN_SHORT_LABEL.get(m, m) for m in snn_models],
+            fontsize=8,
+        )
+        ax.set_ylabel(ylabel, fontsize=8)
+        ax.grid(alpha=0.3, axis="y", zorder=0)
+        ax.tick_params(axis="x", labelsize=8)
+
+    # Shared legend above all subplots
+    handles = [
+        plt.Rectangle((0, 0), 1, 1, color=_get_style(m)["color"], alpha=0.85)
+        for m in snn_models
+    ]
+    labels = [_SNN_SHORT_LABEL.get(m, m) for m in snn_models]
+    fig.legend(handles, labels, loc="upper center", ncol=len(snn_models),
+               fontsize=8, bbox_to_anchor=(0.5, 1.04), frameon=True,
+               framealpha=0.9)
+
+    fig.suptitle("Neuromorphic Efficiency Metrics — SNN Model Comparison",
+                 fontweight="bold", fontsize=11, y=1.12)
+    plt.tight_layout()
+
+    out = plots_dir / "p3_5_neuromorphic_metrics_bar.png"
+    fig.savefig(out, bbox_inches="tight", dpi=300)
+    plt.close(fig)
+    print(f"  Saved: {out.name}")
+
+
 def generate_phase3_plots(results_dir: Path, plots_dir: Path) -> None:
     """Entry point: generate all Phase 3 plots."""
     plots_dir.mkdir(parents=True, exist_ok=True)
@@ -537,5 +636,6 @@ def generate_phase3_plots(results_dir: Path, plots_dir: Path) -> None:
     plot_envelope_comparison(results_dir, plots_dir)
     plot_mae_grouped_bar(results_dir, plots_dir)
     plot_syops_vs_mae_pareto(results_dir, plots_dir)
+    plot_neuromorphic_metrics_bar(results_dir, plots_dir)
     plot_v12_vs_pi_normalized(results_dir, plots_dir)
     plot_log_ratio_mae(results_dir, plots_dir)

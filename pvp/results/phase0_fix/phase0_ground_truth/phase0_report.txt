@@ -1,9 +1,9 @@
 PVP Phase 0 — Ground Truth Calibration
 Code path: evaluate_rate_snn (wrapper-free, NOT BenchmarkSuite)
-Generated: 2026-03-01 01:20:23
+Generated: 2026-03-01 01:00:02
 Scenarios: 3 step scenarios (benchmark-equivalent)
 Max steps per episode: 3000, n_runs: 1, Seed: 42
-Total elapsed: 656.2 s
+Total elapsed: 626.3 s
 
 R0a: best_incremental_snn (best)
   step_low_speed_500rpm_2A: MAE_q = 0.575640 A

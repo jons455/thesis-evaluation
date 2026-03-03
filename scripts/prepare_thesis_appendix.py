@@ -41,8 +41,28 @@ for _p in [str(REPO_ROOT), str(EMBARK_EVAL_DIR)]:
 RESULTS_BASE = EMBARK_EVAL_DIR / "pvp" / "results"
 
 # Metrics to include in Appendix A full table (Pipeline / PVP names)
-APPENDIX_A_METRICS = ["mae_i_q", "itae_i_q", "settling_time_i_q", "overshoot"]
-APPENDIX_A_METRIC_LABELS = {"mae_i_q": "MAE i_q (A)", "itae_i_q": "ITAE i_q (A·s²)", "settling_time_i_q": "Settling time (s)", "overshoot": "Overshoot (%)"}
+APPENDIX_A_METRICS = [
+    "mae_i_q",
+    "mae_i_d",
+    "itae_i_q",
+    "itae_i_d",
+    "settling_time_i_q",
+    "overshoot",
+    "total_syops",
+    "mean_sparsity",
+    "total_spikes",
+]
+APPENDIX_A_METRIC_LABELS = {
+    "mae_i_q": "MAE i_q (A)",
+    "mae_i_d": "MAE i_d (A)",
+    "itae_i_q": "ITAE i_q (A·s²)",
+    "itae_i_d": "ITAE i_d (A·s²)",
+    "settling_time_i_q": "Settling time (s)",
+    "overshoot": "Overshoot (%)",
+    "total_syops": "SyOps",
+    "mean_sparsity": "Sparsity",
+    "total_spikes": "Spikes",
+}
 
 
 def _load_json(path: Path) -> Any:
@@ -144,7 +164,7 @@ def build_appendix_a(results_dir: Path, out_dir: Path) -> None:
     md_lines = [
         "# Appendix A — Full Per-Scenario Metric Tables",
         "",
-        "Complete MAE, ITAE, settling time, and overshoot for PI + 3 SNNs across all scenarios.",
+        "Complete control (MAE, ITAE, settling time, overshoot) and neuromorphic (SyOps, Sparsity, Spikes) metrics for PI + 3 SNNs across all scenarios.",
         "",
         "## Full metrics (4 agents × 6 scenarios)",
         "",
