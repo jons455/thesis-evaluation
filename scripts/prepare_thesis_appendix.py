@@ -97,91 +97,88 @@ def _format_cell(val: Any) -> str:
 
 
 def build_appendix_a(results_dir: Path, out_dir: Path) -> None:
-    """Appendix A: Full per-scenario metric table (PI + 3 SNNs × 6 scenarios) + Phase 0 MAE_q."""
+    """Appendix A: Full per-scenario metric table (PI + 3 SNNs × 6 scenarios) + Phase 0 MAE_q + neuromorphic."""
     phase3_dir = results_dir / "phase3_discriminative"
     phase0_dir = results_dir / "phase0_ground_truth"
-    if not phase3_dir.exists():
-        print(f"  [skip] Appendix A: {phase3_dir} not found")
-        return
-
-    summaries_path = phase3_dir / "phase3_summaries.json"
-    if not summaries_path.exists():
-        print(f"  [skip] Appendix A: {summaries_path} not found")
-        return
-
-    try:
-        summaries = _load_json(summaries_path)
-    except Exception as e:
-        print(f"  [skip] Appendix A: could not load summaries: {e}")
-        return
-
-    # Build full table: rows = (agent, scenario), columns = MAE, ITAE, settling, overshoot
-    rows: list[dict[str, Any]] = []
-    scenario_list = sorted(
-        dict.fromkeys(
-            sr.get("name") or sr.get("scenario_name")
-            for m in summaries.values()
-            for sr in (m.get("scenarios") or m.get("scenario_results") or [])
-            if (sr.get("name") or sr.get("scenario_name"))
-        )
-    )
-
-    seen = set()
-    for model_name, summary in summaries.items():
-        scenarios_data = summary.get("scenarios") or summary.get("scenario_results") or []
-        for sr in scenarios_data:
-            name = sr.get("name") or sr.get("scenario_name")
-            if not name or (model_name, name) in seen:
-                continue
-            seen.add((model_name, name))
-            metrics = sr.get("metrics") or {}
-            row = {
-                "Agent": model_name,
-                "Scenario": name,
-                **{APPENDIX_A_METRIC_LABELS.get(k, k): _safe_float(metrics.get(k)) for k in APPENDIX_A_METRICS},
-            }
-            rows.append(row)
-
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # CSV: one row per (agent, scenario) with columns Agent, Scenario, MAE, ITAE, Settling, Overshoot
-    csv_path = out_dir / "appendix_A_full_metrics_table.csv"
-    if rows:
-        fieldnames = ["Agent", "Scenario"] + [APPENDIX_A_METRIC_LABELS[k] for k in APPENDIX_A_METRICS]
-        with open(csv_path, "w", newline="", encoding="utf-8") as f:
-            w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-            w.writeheader()
-            for r in rows:
-                out = {}
-                for k in fieldnames:
-                    v = r.get(k)
-                    out[k] = _format_cell(v) if k not in ("Agent", "Scenario") else (v if v is not None else "—")
-                w.writerow(out)
-        print(f"  Wrote {csv_path}")
+    # Phase 3 full metrics table (may be absent in partial runs)
+    summaries = None
+    summaries_path = phase3_dir / "phase3_summaries.json" if phase3_dir.exists() else None
+    if summaries_path and summaries_path.exists():
+        try:
+            summaries = _load_json(summaries_path)
+        except Exception as e:
+            print(f"  [skip] Appendix A Phase 3 table: could not load summaries: {e}")
 
-    # Markdown: same table
-    md_path = out_dir / "appendix_A_full_metrics_table.md"
-    md_lines = [
-        "# Appendix A — Full Per-Scenario Metric Tables",
-        "",
-        "Complete control (MAE, ITAE, settling time, overshoot) and neuromorphic (SyOps, Sparsity, Spikes) metrics for PI + 3 SNNs across all scenarios.",
-        "",
-        "## Full metrics (4 agents × 6 scenarios)",
-        "",
-    ]
-    if rows:
-        headers = ["Agent", "Scenario"] + [APPENDIX_A_METRIC_LABELS[k] for k in APPENDIX_A_METRICS]
-        md_lines.append("| " + " | ".join(headers) + " |")
-        md_lines.append("| " + " | ".join("---" for _ in headers) + " |")
-        for r in rows:
-            cells = []
-            for h in headers:
-                v = r.get(h)
-                cells.append(_format_cell(v) if h not in ("Agent", "Scenario") else (str(v) if v is not None else "—"))
-            md_lines.append("| " + " | ".join(cells) + " |")
-    md_lines.append("")
-    md_path.write_text("\n".join(md_lines), encoding="utf-8")
-    print(f"  Wrote {md_path}")
+    if summaries is None:
+        print(f"  [skip] Appendix A Phase 3 table: no phase3_summaries.json")
+    else:
+        # Build full table: rows = (agent, scenario), columns = MAE, ITAE, settling, overshoot
+        rows: list[dict[str, Any]] = []
+        scenario_list = sorted(
+            dict.fromkeys(
+                sr.get("name") or sr.get("scenario_name")
+                for m in summaries.values()
+                for sr in (m.get("scenarios") or m.get("scenario_results") or [])
+                if (sr.get("name") or sr.get("scenario_name"))
+            )
+        )
+
+        seen = set()
+        for model_name, summary in summaries.items():
+            scenarios_data = summary.get("scenarios") or summary.get("scenario_results") or []
+            for sr in scenarios_data:
+                name = sr.get("name") or sr.get("scenario_name")
+                if not name or (model_name, name) in seen:
+                    continue
+                seen.add((model_name, name))
+                metrics = sr.get("metrics") or {}
+                row = {
+                    "Agent": model_name,
+                    "Scenario": name,
+                    **{APPENDIX_A_METRIC_LABELS.get(k, k): _safe_float(metrics.get(k)) for k in APPENDIX_A_METRICS},
+                }
+                rows.append(row)
+
+        # CSV: one row per (agent, scenario) with columns Agent, Scenario, MAE, ITAE, Settling, Overshoot
+        csv_path = out_dir / "appendix_A_full_metrics_table.csv"
+        if rows:
+            fieldnames = ["Agent", "Scenario"] + [APPENDIX_A_METRIC_LABELS[k] for k in APPENDIX_A_METRICS]
+            with open(csv_path, "w", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+                w.writeheader()
+                for r in rows:
+                    out = {}
+                    for k in fieldnames:
+                        v = r.get(k)
+                        out[k] = _format_cell(v) if k not in ("Agent", "Scenario") else (v if v is not None else "—")
+                    w.writerow(out)
+            print(f"  Wrote {csv_path}")
+
+        # Markdown: same table
+        md_path = out_dir / "appendix_A_full_metrics_table.md"
+        md_lines = [
+            "# Appendix A — Full Per-Scenario Metric Tables",
+            "",
+            "Complete control (MAE, ITAE, settling time, overshoot) and neuromorphic (SyOps, Sparsity, Spikes) metrics for PI + 3 SNNs across all scenarios.",
+            "",
+            "## Full metrics (4 agents × 6 scenarios)",
+            "",
+        ]
+        if rows:
+            headers = ["Agent", "Scenario"] + [APPENDIX_A_METRIC_LABELS[k] for k in APPENDIX_A_METRICS]
+            md_lines.append("| " + " | ".join(headers) + " |")
+            md_lines.append("| " + " | ".join("---" for _ in headers) + " |")
+            for r in rows:
+                cells = []
+                for h in headers:
+                    v = r.get(h)
+                    cells.append(_format_cell(v) if h not in ("Agent", "Scenario") else (str(v) if v is not None else "—"))
+                md_lines.append("| " + " | ".join(cells) + " |")
+        md_lines.append("")
+        md_path.write_text("\n".join(md_lines), encoding="utf-8")
+        print(f"  Wrote {md_path}")
 
     # Phase 0 raw MAE_q
     phase0_rankings_path = phase0_dir / "phase0_rankings.json"
@@ -207,6 +204,48 @@ def build_appendix_a(results_dir: Path, out_dir: Path) -> None:
     else:
         phase0_md_path.write_text("# Appendix A — Phase 0 MAE_q\n\n(No phase0_rankings.json found for this run.)\n", encoding="utf-8")
         print(f"  Wrote {phase0_md_path} (no data)")
+
+    # Phase 0 neuromorphic baselines
+    phase0_neuro_path = phase0_dir / "phase0_neuromorphic.json"
+    phase0_neuro_md_path = out_dir / "appendix_A_phase0_neuromorphic.md"
+    if phase0_neuro_path.exists():
+        try:
+            neuro_data = _load_json(phase0_neuro_path)
+            scens = sorted(next(iter(neuro_data.values())).keys()) if neuro_data else []
+            neuro_metrics_display = [
+                ("SyOps/step", "syops_per_step"),
+                ("Sparsity", "mean_sparsity"),
+                ("Spikes/step", "spikes_per_step"),
+            ]
+            mdn = [
+                "# Appendix A — Phase 0 Neuromorphic Baselines",
+                "",
+                "Neuromorphic efficiency metrics per model per scenario from Phase 0 pipeline evaluation.",
+                "",
+            ]
+            for label, key in neuro_metrics_display:
+                mdn.append(f"## {label}")
+                mdn.append("")
+                mdn.append("| Model | " + " | ".join(scens) + " |")
+                mdn.append("| --- | " + " | ".join("---" for _ in scens) + " |")
+                for model, scen_data in neuro_data.items():
+                    cells = []
+                    for s in scens:
+                        val = (scen_data.get(s) or {}).get(key)
+                        cells.append(_format_cell(val))
+                    mdn.append("| " + model + " | " + " | ".join(cells) + " |")
+                mdn.append("")
+            phase0_neuro_md_path.write_text("\n".join(mdn), encoding="utf-8")
+            print(f"  Wrote {phase0_neuro_md_path}")
+        except Exception as e:
+            print(f"  [skip] Phase 0 neuromorphic table: {e}")
+    else:
+        phase0_neuro_md_path.write_text(
+            "# Appendix A — Phase 0 Neuromorphic Baselines\n\n"
+            "(No phase0_neuromorphic.json found for this run.)\n",
+            encoding="utf-8",
+        )
+        print(f"  Wrote {phase0_neuro_md_path} (no data)")
 
 
 def build_appendix_b(results_dir: Path, out_dir: Path) -> None:

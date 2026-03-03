@@ -142,16 +142,15 @@ def interpret_phase1(results_dir: Path) -> dict:
     return {"status": "ok", "overall_pass": overall_pass, "scenarios": scenario_verdicts}
 
 
-def interpret_phase2(results_dir: Path) -> dict:
-    """SC-2: manual vs pipeline deviations. N/A metrics are skipped."""
-    data = _load_json(results_dir / "phase2_metric_validation" / "phase2_validation.json")
-    if data is None:
-        return {"status": "missing", "comparisons": []}
+def _apply_deviation_verdicts(
+    comparisons: list[dict],
+) -> tuple[list[dict], bool]:
+    """Apply standard tolerance tiers to a list of metric comparisons.
 
-    comparisons = data.get("comparisons", [])
-    overall_pass = True
+    Returns (interpreted_list, all_pass).
+    """
+    all_pass = True
     interpreted: list[dict] = []
-
     for comp in comparisons:
         dev = comp.get("deviation", float("nan"))
         manual = comp.get("manual", float("nan"))
@@ -165,16 +164,38 @@ def interpret_phase2(results_dir: Path) -> dict:
             verdict = "INVESTIGATE (< 1e-3)"
         else:
             verdict = "HARD FAIL (≥ 1e-3)"
-            overall_pass = False
+            all_pass = False
 
         interpreted.append({**comp, "verdict": verdict})
+    return interpreted, all_pass
+
+
+def interpret_phase2(results_dir: Path) -> dict:
+    """SC-2: manual vs pipeline deviations. N/A metrics are skipped."""
+    data = _load_json(results_dir / "phase2_metric_validation" / "phase2_validation.json")
+    if data is None:
+        return {"status": "missing", "comparisons": [], "neuromorphic_comparisons": []}
+
+    # Part A: control metrics
+    control_comps, control_pass = _apply_deviation_verdicts(
+        data.get("comparisons", [])
+    )
+
+    # Part B: neuromorphic metrics
+    neuro_comps, neuro_pass = _apply_deviation_verdicts(
+        data.get("neuromorphic_comparisons", [])
+    )
+
+    overall_pass = control_pass and neuro_pass
 
     return {
         "status": "ok",
         "overall_pass": overall_pass,
         "scenario": data.get("scenario"),
         "step_onset": data.get("step_onset"),
-        "comparisons": interpreted,
+        "comparisons": control_comps,
+        "neuromorphic_comparisons": neuro_comps,
+        "snn_model": data.get("snn_model"),
     }
 
 
@@ -341,14 +362,29 @@ def interpret_all(results_dir: Path, run_name: str | None = None) -> dict:
         print(f"  Overall Phase 2: {overall}")
         report_lines.append(f"Phase 2 — Metric Validation (SC-2): {overall}")
         report_lines.append(f"  Scenario: {p2.get('scenario')}, step onset: {p2.get('step_onset')}")
-        header = f"  {'Metric':<20s} {'Deviation':>14s} {'Verdict'}"
+        # Part A: control metrics
+        report_lines.append("  Part A — Control Metrics (PI):")
+        header = f"    {'Metric':<20s} {'Deviation':>14s} {'Verdict'}"
         report_lines.append(header)
         for comp in p2["comparisons"]:
             dev = comp.get("deviation", float("nan"))
             dev_str = f"{dev:.2e}" if not _nan(dev) else "N/A"
-            line = f"  {comp['metric']:<20s} {dev_str:>14s}   {comp['verdict']}"
+            line = f"    {comp['metric']:<20s} {dev_str:>14s}   {comp['verdict']}"
             print(f"  {line}")
             report_lines.append(f"  {line}")
+        # Part B: neuromorphic metrics
+        neuro_comps = p2.get("neuromorphic_comparisons", [])
+        if neuro_comps:
+            snn_model = p2.get("snn_model", "SNN")
+            report_lines.append(f"  Part B — Neuromorphic Metrics ({snn_model}):")
+            header_n = f"    {'Metric':<20s} {'Deviation':>14s} {'Verdict'}"
+            report_lines.append(header_n)
+            for comp in neuro_comps:
+                dev = comp.get("deviation", float("nan"))
+                dev_str = f"{dev:.2e}" if not _nan(dev) else "N/A"
+                line = f"    {comp['metric']:<20s} {dev_str:>14s}   {comp['verdict']}"
+                print(f"  {line}")
+                report_lines.append(f"  {line}")
         report_lines.append("")
 
     # --- Phase 3 ---

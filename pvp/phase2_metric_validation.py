@@ -1,9 +1,16 @@
 """
 PVP Phase 2 — Metric Validation (SC-2).
 
+Part A — Control Metrics (PI controller):
 Uses R2 data (PI via wrapper) on `step_mid_speed_1500rpm_2A`, float64.
 Computes MAE, ITAE, Settling Time, Overshoot manually from the trajectory
 using NumPy, and compares against the pipeline accumulator values.
+
+Part B — Neuromorphic Metrics (SNN controller):
+Runs best_incremental_snn on the same scenario.  Manually accumulates
+total_spikes, syops, and activation_sparsity from raw per-step
+controller_info dicts using NumPy, and compares against the pipeline
+accumulator values (SpikeCount, SynapticOps, ActivationSparsity).
 
 MAE alignment: the pipeline (TrackingMAE) receives update(state, reference, ...)
 and uses (reference, state) at each step — i.e. ref_t vs state at step start.
@@ -46,6 +53,8 @@ for _p in [str(_repo_root), str(_embark_eval_dir)]:
         sys.path.insert(0, _p)
 
 from pvp.utils.common import (
+    MODELS,
+    build_snn_controller,
     ensure_results_dir,
     save_json,
     save_text_report,
@@ -196,6 +205,40 @@ def _manual_rms_steady_state(
         return float("nan")
     err = i[start_k:] - i_ref[start_k:]
     return float(np.sqrt(np.mean(err * err)))
+
+
+# ---------------------------------------------------------------------------
+# Neuromorphic manual computation (Part B)
+# ---------------------------------------------------------------------------
+
+
+def _manual_spike_count(per_step_spikes: list[float]) -> dict[str, float]:
+    """Manual total spike count from raw per-step controller_info values."""
+    total = sum(per_step_spikes)
+    return {
+        "total_spikes": float(total),
+        "spikes_per_step": float(total) / len(per_step_spikes) if per_step_spikes else 0.0,
+    }
+
+
+def _manual_synaptic_ops(per_step_syops: list[float]) -> dict[str, float]:
+    """Manual total synaptic operations from raw per-step controller_info values."""
+    total = sum(per_step_syops)
+    return {
+        "total_syops": float(total),
+        "syops_per_step": float(total) / len(per_step_syops) if per_step_syops else 0.0,
+    }
+
+
+def _manual_activation_sparsity(per_step_sparsity: list[float]) -> dict[str, float]:
+    """Manual activation sparsity stats from raw per-step controller_info values."""
+    if not per_step_sparsity:
+        return {"mean_sparsity": 0.0, "min_sparsity": 0.0, "max_sparsity": 0.0}
+    return {
+        "mean_sparsity": sum(per_step_sparsity) / len(per_step_sparsity),
+        "min_sparsity": min(per_step_sparsity),
+        "max_sparsity": max(per_step_sparsity),
+    }
 
 
 def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
@@ -351,9 +394,116 @@ def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
         report_lines.append(line)
 
     report_lines.append("")
+
+    # ===================================================================
+    # Part B — Neuromorphic Metric Validation (SNN controller)
+    # ===================================================================
+    print("")
+    print("  --- Part B: Neuromorphic Metric Validation ---")
+
+    snn_spec = MODELS[0]  # best_incremental_snn
+    snn_controller, _snn_meta = build_snn_controller(snn_spec)
+    print(f"  SNN probe: {snn_spec.name} ({snn_spec.version})")
+
+    # Fresh task + metrics for SNN run
+    snn_task = target_scenario.create_task(physics_config=pmsm_config)
+    snn_metrics = create_metrics(snn_controller)
+
+    if hasattr(snn_controller, "configure"):
+        snn_controller.configure(snn_task.physics_engine.config, snn_task)
+
+    snn_state, snn_reference = snn_task.reset()
+    snn_controller.reset()
+    for m in snn_metrics:
+        m.reset()
+
+    # Per-step raw neuromorphic data
+    raw_spikes: list[float] = []
+    raw_syops: list[float] = []
+    raw_sparsity: list[float] = []
+
+    snn_step = 0
+    snn_done = False
+
+    while not snn_done and snn_step < target_scenario.max_steps:
+        snn_action = snn_controller(snn_state, snn_reference)
+        snn_info = getattr(snn_controller, "last_info", None)
+        snn_next_state, snn_next_ref, snn_done = snn_task.step(snn_action)
+
+        for m in snn_metrics:
+            m.update(snn_state, snn_reference, snn_action, snn_next_state, snn_info)
+
+        # Capture raw per-step neuromorphic values
+        if snn_info:
+            raw_spikes.append(float(snn_info.get("total_spikes", 0)))
+            raw_syops.append(float(snn_info.get("syops", 0)))
+            raw_sparsity.append(float(snn_info.get("sparsity", 0)))
+
+        snn_state, snn_reference = snn_next_state, snn_next_ref
+        snn_step += 1
+
+    # Pipeline neuromorphic metrics
+    snn_pipeline: dict[str, Any] = {"steps": snn_step}
+    for m in snn_metrics:
+        result = m.compute()
+        if isinstance(result, dict):
+            snn_pipeline.update(result)
+        else:
+            snn_pipeline[m.name] = result
+
+    # Manual neuromorphic metrics
+    manual_spikes = _manual_spike_count(raw_spikes)
+    manual_syops = _manual_synaptic_ops(raw_syops)
+    manual_sparsity = _manual_activation_sparsity(raw_sparsity)
+
+    # Compare
+    neuromorphic_comparisons: list[dict[str, Any]] = []
+    neuro_pairs = [
+        ("Total_spikes", manual_spikes["total_spikes"], snn_pipeline.get("total_spikes", float("nan"))),
+        ("Spikes_per_step", manual_spikes["spikes_per_step"], snn_pipeline.get("spikes_per_step", float("nan"))),
+        ("Total_syops", manual_syops["total_syops"], snn_pipeline.get("total_syops", float("nan"))),
+        ("SyOps_per_step", manual_syops["syops_per_step"], snn_pipeline.get("syops_per_step", float("nan"))),
+        ("Mean_sparsity", manual_sparsity["mean_sparsity"], snn_pipeline.get("mean_sparsity", float("nan"))),
+        ("Min_sparsity", manual_sparsity["min_sparsity"], snn_pipeline.get("min_sparsity", float("nan"))),
+    ]
+
+    report_lines.append("--- Part B: Neuromorphic Metric Validation ---")
+    report_lines.append(f"SNN probe: {snn_spec.name} ({snn_spec.version})")
+    report_lines.append(f"Steps: {snn_step}")
+    report_lines.append(f"Raw controller_info samples: {len(raw_spikes)}")
+    report_lines.append("")
+    report_lines.append(
+        f"{'Metric':<25s} {'Manual':>14s} {'Pipeline':>14s} {'Deviation':>14s}"
+    )
+    report_lines.append("-" * 70)
+
+    for name, manual_val, pipeline_val in neuro_pairs:
+        if np.isnan(manual_val) or np.isnan(pipeline_val):
+            dev = float("nan")
+        else:
+            dev = abs(manual_val - pipeline_val)
+
+        comp = {
+            "metric": name,
+            "manual": manual_val,
+            "pipeline": pipeline_val,
+            "deviation": dev,
+        }
+        neuromorphic_comparisons.append(comp)
+
+        manual_str = "N/A" if np.isnan(manual_val) else f"{manual_val:14.6f}"
+        pipe_str = "N/A" if np.isnan(pipeline_val) else f"{pipeline_val:14.6f}"
+        dev_str = "N/A" if np.isnan(dev) else f"{dev:14.2e}"
+        line = f"  {name:<25s} {manual_str:>14s} {pipe_str:>14s} {dev_str:>14s}"
+        print(line)
+        report_lines.append(line)
+
+    report_lines.append("")
     report_lines.append("(No pass/fail verdicts — see interpret_results.py)")
 
-    # Save (include manual_mae_next for diagnostics: MAE using next_state vs ref)
+    # ===================================================================
+    # Save all results
+    # ===================================================================
     def _json_float(v: float):
         """Convert non-finite floats to None for JSON serialisation."""
         if isinstance(v, float) and (np.isnan(v) or np.isinf(v)):
@@ -370,9 +520,6 @@ def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
             "pipeline_metrics": pipeline_results,
             "manual_mae_next_state": manual_mae_next,
             # Raw trajectory for Plot 2.4 (step response timeseries).
-            # i_q_at_step_start[k] = state["i_q"] at start of step k (t = k*dt).
-            # i_q[k]              = next_state["i_q"] after step k (t = (k+1)*dt).
-            # i_q_ref[k]          = reference during step k.
             "trajectory": {
                 "i_q": trajectory["i_q"],
                 "i_q_ref": trajectory["i_q_ref"],
@@ -385,12 +532,26 @@ def run_phase2(run_name: str | None = None, seed: int = 42) -> dict:
                 "itae_i_q": _json_float(manual_itae),
                 "mae_i_q": _json_float(manual_mae),
             },
+            # Part B: Neuromorphic metric validation
+            "snn_model": snn_spec.name,
+            "neuromorphic_comparisons": neuromorphic_comparisons,
+            "neuromorphic_pipeline_metrics": {
+                k: snn_pipeline.get(k)
+                for k in [
+                    "total_spikes", "spikes_per_step",
+                    "total_syops", "syops_per_step",
+                    "mean_sparsity", "min_sparsity", "max_sparsity",
+                ]
+            },
         },
         results_dir / "phase2_validation.json",
     )
     save_text_report(report_lines, results_dir / "phase2_report.txt")
 
-    return {"comparisons": comparisons}
+    return {
+        "comparisons": comparisons,
+        "neuromorphic_comparisons": neuromorphic_comparisons,
+    }
 
 
 def main() -> int:

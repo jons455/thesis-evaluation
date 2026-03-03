@@ -9,14 +9,22 @@ simultaneously corrupt the ground-truth reference (Phase 0) and the
 pipeline under test (Phase 3), so the discriminative test (SC-3) is
 non-circular.
 
+After the MAE_q ground truth, a second pass collects neuromorphic
+baselines (SyOps, spikes, activation sparsity) per model per scenario
+using the pipeline path (build_snn_controller + create_metrics).  These
+baselines use the same code path as Phase 3, which is acceptable: there
+is no independent reference for neuromorphic metrics—they originate
+from the model itself.
+
 Scenarios mirror the three single-step STANDARD_SCENARIOS conditions
 (500/1500/2500 rpm, 2 A) implemented directly via PMSMCurrentControlTask
 instead of BenchmarkSuite.  Multi-step / four-quadrant / field-weakening
 scenarios require the harness API and are covered in Phase 3 only.
 
 Runs: R0a (best), R0b (intermediate), R0c (poor).
-Output: phase0_rankings.json — MAE_q per scenario per model.
-        phase0_report.txt  — raw data, no pass/fail verdicts.
+Output: phase0_rankings.json      — MAE_q per scenario per model.
+        phase0_neuromorphic.json   — SyOps, spikes, sparsity per scenario per model.
+        phase0_report.txt          — raw data, no pass/fail verdicts.
 
 Spread check and ranking verdicts are in interpret_results.py.
 
@@ -40,6 +48,7 @@ for _p in [str(_repo_root), str(_embark_eval_dir)]:
 
 from pvp.utils.common import (
     MODELS,
+    build_snn_controller,
     ensure_results_dir,
     get_model_path,
     save_json,
@@ -180,11 +189,91 @@ def run_phase0(
         )
         report_lines.append(f"  {sn}: {ranking_str}")
 
+    # ===================================================================
+    # Neuromorphic baselines (pipeline path — SyOps, spikes, sparsity)
+    # ===================================================================
+    print("\n  --- Neuromorphic Baselines (pipeline path) ---")
+    report_lines.append("")
+    report_lines.append("--- Neuromorphic Baselines (pipeline path) ---")
+
+    from embark.benchmark.harness import STANDARD_SCENARIOS
+    from embark.benchmark.metrics.neurobench_factory import create_metrics
+    from embark.benchmark.physics.config import PMSMConfig
+
+    pmsm_config = PMSMConfig()
+
+    # Map Phase 0 scenario names to STANDARD_SCENARIOS objects
+    std_scenario_map = {s.name: s for s in STANDARD_SCENARIOS}
+
+    neuromorphic_baselines: dict[str, dict[str, dict[str, float]]] = {}
+    neuro_keys = ["syops_per_step", "mean_sparsity", "total_spikes", "spikes_per_step"]
+
+    for spec in MODELS:
+        run_id = run_ids[spec.quality]
+        controller, _meta = build_snn_controller(spec)
+        neuromorphic_baselines[spec.name] = {}
+
+        report_lines.append(f"{run_id}: {spec.name} ({spec.quality})")
+
+        for scen in PHASE0_SCENARIOS:
+            sname = scen["name"]
+            std_scen = std_scenario_map.get(sname)
+            if std_scen is None:
+                neuromorphic_baselines[spec.name][sname] = {}
+                continue
+
+            task = std_scen.create_task(physics_config=pmsm_config)
+            neuro_metrics = create_metrics(controller)
+
+            if hasattr(controller, "configure"):
+                controller.configure(task.physics_engine.config, task)
+
+            state, reference = task.reset()
+            controller.reset()
+            for m_obj in neuro_metrics:
+                m_obj.reset()
+
+            step_n = 0
+            done_n = False
+            n_max_steps = max_steps if not quick else 500
+
+            while not done_n and step_n < n_max_steps:
+                action = controller(state, reference)
+                c_info = getattr(controller, "last_info", None)
+                next_state, next_ref, done_n = task.step(action)
+
+                for m_obj in neuro_metrics:
+                    m_obj.update(state, reference, action, next_state, c_info)
+
+                state, reference = next_state, next_ref
+                step_n += 1
+
+            # Extract neuromorphic results
+            neuro_results: dict[str, float] = {}
+            for m_obj in neuro_metrics:
+                result = m_obj.compute()
+                if isinstance(result, dict):
+                    neuro_results.update(result)
+
+            scen_baselines = {k: neuro_results.get(k, 0.0) for k in neuro_keys}
+            neuromorphic_baselines[spec.name][sname] = scen_baselines
+
+            syops_s = f"{scen_baselines['syops_per_step']:.1f}"
+            spars_s = f"{scen_baselines['mean_sparsity']:.4f}"
+            spks_s = f"{scen_baselines['total_spikes']:.0f}"
+            print(f"    {sname}: SyOps/step={syops_s}, sparsity={spars_s}, spikes={spks_s}")
+            report_lines.append(
+                f"  {sname}: SyOps/step={syops_s}, sparsity={spars_s}, spikes={spks_s}"
+            )
+
+        report_lines.append("")
+
     # --- Save ---
     save_json(rankings, results_dir / "phase0_rankings.json")
+    save_json(neuromorphic_baselines, results_dir / "phase0_neuromorphic.json")
     save_text_report(report_lines, results_dir / "phase0_report.txt")
 
-    print(f"\n  Saved phase0_rankings.json to {results_dir}")
+    print(f"\n  Saved phase0_rankings.json and phase0_neuromorphic.json to {results_dir}")
     return rankings
 
 
