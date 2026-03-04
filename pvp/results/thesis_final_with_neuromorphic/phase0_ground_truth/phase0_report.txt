@@ -1,9 +1,9 @@
 PVP Phase 0 — Ground Truth Calibration
 Code path: evaluate_rate_snn (wrapper-free, NOT BenchmarkSuite)
-Generated: 2026-03-01 01:00:02
+Generated: 2026-03-04 18:03:15
 Scenarios: 3 step scenarios (benchmark-equivalent)
 Max steps per episode: 3000, n_runs: 1, Seed: 42
-Total elapsed: 626.3 s
+Total elapsed: 535.2 s
 
 R0a: best_incremental_snn (best)
   step_low_speed_500rpm_2A: MAE_q = 0.575640 A
@@ -32,3 +32,19 @@ R0c: poor_no_tanh (poor)
   step_low_speed_500rpm_2A: best_incremental_snn(0.5756) < intermediate_scheduled_sampling(0.8947) < poor_no_tanh(0.9425)
   step_mid_speed_1500rpm_2A: best_incremental_snn(0.7249) < intermediate_scheduled_sampling(0.7989) < poor_no_tanh(3.8608)
   step_high_speed_2500rpm_2A: intermediate_scheduled_sampling(0.6281) < best_incremental_snn(0.8960) < poor_no_tanh(1.9488)
+
+--- Neuromorphic Baselines (pipeline path) ---
+R0a: best_incremental_snn (best)
+  step_low_speed_500rpm_2A: SyOps/step=44157.8, sparsity=0.9408, spikes=2453210
+  step_mid_speed_1500rpm_2A: SyOps/step=66308.6, sparsity=0.9112, spikes=3683811
+  step_high_speed_2500rpm_2A: SyOps/step=90182.4, sparsity=0.8792, spikes=5010133
+
+R0b: intermediate_scheduled_sampling (intermediate)
+  step_low_speed_500rpm_2A: SyOps/step=70930.3, sparsity=0.9050, spikes=3940572
+  step_mid_speed_1500rpm_2A: SyOps/step=76610.1, sparsity=0.8974, spikes=4256115
+  step_high_speed_2500rpm_2A: SyOps/step=85093.5, sparsity=0.8860, spikes=4727418
+
+R0c: poor_no_tanh (poor)
+  step_low_speed_500rpm_2A: SyOps/step=40929.6, sparsity=0.9452, spikes=2273868
+  step_mid_speed_1500rpm_2A: SyOps/step=44068.3, sparsity=0.9410, spikes=2448239
+  step_high_speed_2500rpm_2A: SyOps/step=51417.4, sparsity=0.9311, spikes=2856522

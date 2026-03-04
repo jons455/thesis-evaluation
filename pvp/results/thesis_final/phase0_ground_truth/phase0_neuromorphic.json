@@ -1,0 +1,62 @@
+{
+  "best_incremental_snn": {
+    "step_low_speed_500rpm_2A": {
+      "syops_per_step": 44157.78,
+      "mean_sparsity": 0.9408460286458317,
+      "total_spikes": 2453210.0,
+      "spikes_per_step": 817.7366666666667
+    },
+    "step_mid_speed_1500rpm_2A": {
+      "syops_per_step": 66308.598,
+      "mean_sparsity": 0.9111733940972205,
+      "total_spikes": 3683811.0,
+      "spikes_per_step": 1227.937
+    },
+    "step_high_speed_2500rpm_2A": {
+      "syops_per_step": 90182.394,
+      "mean_sparsity": 0.8791933593749987,
+      "total_spikes": 5010133.0,
+      "spikes_per_step": 1670.0443333333333
+    }
+  },
+  "intermediate_scheduled_sampling": {
+    "step_low_speed_500rpm_2A": {
+      "syops_per_step": 70930.296,
+      "mean_sparsity": 0.9049818793402788,
+      "total_spikes": 3940572.0,
+      "spikes_per_step": 1313.524
+    },
+    "step_mid_speed_1500rpm_2A": {
+      "syops_per_step": 76610.07,
+      "mean_sparsity": 0.8973731553819461,
+      "total_spikes": 4256115.0,
+      "spikes_per_step": 1418.705
+    },
+    "step_high_speed_2500rpm_2A": {
+      "syops_per_step": 85093.524,
+      "mean_sparsity": 0.8860099826388906,
+      "total_spikes": 4727418.0,
+      "spikes_per_step": 1575.806
+    }
+  },
+  "poor_no_tanh": {
+    "step_low_speed_500rpm_2A": {
+      "syops_per_step": 40929.624,
+      "mean_sparsity": 0.9451710069444444,
+      "total_spikes": 2273868.0,
+      "spikes_per_step": 757.956
+    },
+    "step_mid_speed_1500rpm_2A": {
+      "syops_per_step": 44068.302,
+      "mean_sparsity": 0.9409665798611101,
+      "total_spikes": 2448239.0,
+      "spikes_per_step": 816.0796666666666
+    },
+    "step_high_speed_2500rpm_2A": {
+      "syops_per_step": 51417.396,
+      "mean_sparsity": 0.9311213107638883,
+      "total_spikes": 2856522.0,
+      "spikes_per_step": 952.174
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "timing": [
+    {
+      "name": "PI-baseline",
+      "wall_time_s": 6.3338554999972985
+    },
+    {
+      "name": "best_incremental_snn",
+      "wall_time_s": 696.9528662999983,
+      "total_steps": 34000,
+      "time_per_step_us": 20498.613714705833,
+      "num_scenarios": 6
+    },
+    {
+      "name": "intermediate_scheduled_sampling",
+      "wall_time_s": 698.2663189999985,
+      "total_steps": 34000,
+      "time_per_step_us": 20537.244676470542,
+      "num_scenarios": 6
+    },
+    {
+      "name": "poor_no_tanh",
+      "wall_time_s": 695.5066435999979,
+      "total_steps": 34000,
+      "time_per_step_us": 20456.077752941117,
+      "num_scenarios": 6
+    }
+  ],
+  "total_wall_s": 2097.059684399992,
+  "feasible": true
+}

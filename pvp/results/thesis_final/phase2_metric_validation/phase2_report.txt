@@ -2,7 +2,7 @@ PVP Phase 2 — Metric Validation
 Scenario: step_mid_speed_1500rpm_2A
 Step onset index: 0, pre_step_ref: 0.0
 Steps: 3000, dt: 0.0001
-Generated: 2026-02-28 10:17:18
+Generated: 2026-03-04 18:11:59
 
 Metric                            Manual       Pipeline      Deviation
 ----------------------------------------------------------------------
@@ -13,5 +13,19 @@ Metric                            Manual       Pipeline      Deviation
   Overshoot_i_q             117.5471645679 117.5471645679       0.00e+00
   RMS_i_q_steady_state        0.0000003058   0.0000003058       5.29e-12
   RMS_i_d_steady_state        0.0000003664   0.0000003664       3.08e-11
+
+--- Part B: Neuromorphic Metric Validation ---
+SNN probe: best_incremental_snn (v12)
+Steps: 3000
+Raw controller_info samples: 3000
+
+Metric                            Manual       Pipeline      Deviation
+----------------------------------------------------------------------
+  Total_spikes              3683811.000000 3683811.000000       0.00e+00
+  Spikes_per_step              1227.937000    1227.937000       0.00e+00
+  Total_syops               198925794.000000 198925794.000000       0.00e+00
+  SyOps_per_step              66308.598000   66308.598000       0.00e+00
+  Mean_sparsity                   0.911173       0.911173       0.00e+00
+  Min_sparsity                    0.660156       0.660156       0.00e+00
 
 (No pass/fail verdicts — see interpret_results.py)

@@ -4,6 +4,12 @@ PVP — Run All Phases.
 Orchestrator that runs Phases 0–4 and 6 sequentially (Phase 5 requires
 hardware and is skipped unless --hil-host is provided).
 
+Neuromorphic evaluation is integrated by default:
+  - Phase 0 collects neuromorphic baselines (SyOps, spikes, sparsity)
+    per model per scenario alongside MAE_q ground truth.
+  - Phase 2 validates neuromorphic accumulator outputs against manual
+    NumPy reference implementations (Part B) alongside control metrics.
+
 Results are saved under:
     embark-evaluation/evaluation/results/<run_name>/
         phase0_ground_truth/
@@ -97,7 +103,7 @@ def main() -> int:
     # --- Phase 0 ---
     if "0" not in skip_phases:
         print("\n" + "=" * 70)
-        print("  PHASE 0 — Ground Truth Calibration")
+        print("  PHASE 0 — Ground Truth Calibration (MAE_q + Neuromorphic Baselines)")
         print("=" * 70)
         try:
             from pvp.phase0_ground_truth import run_phase0
@@ -105,7 +111,11 @@ def main() -> int:
             t0 = time.perf_counter()
             result = run_phase0(run_name=run_name, seed=args.seed)
             phase_times["phase0"] = time.perf_counter() - t0
-            results_summary["phase0"] = {"status": "completed", "time_s": phase_times["phase0"]}
+            results_summary["phase0"] = {
+                "status": "completed",
+                "includes_neuromorphic": True,
+                "time_s": phase_times["phase0"],
+            }
         except Exception as e:
             print(f"  Phase 0 FAILED: {e}")
             traceback.print_exc()
@@ -141,7 +151,7 @@ def main() -> int:
     # --- Phase 2 ---
     if "2" not in skip_phases:
         print("\n" + "=" * 70)
-        print("  PHASE 2 — Metric Validation")
+        print("  PHASE 2 — Metric Validation (Control + Neuromorphic)")
         print("=" * 70)
         try:
             from pvp.phase2_metric_validation import run_phase2
@@ -149,9 +159,12 @@ def main() -> int:
             t0 = time.perf_counter()
             result = run_phase2(run_name=run_name, seed=args.seed)
             phase_times["phase2"] = time.perf_counter() - t0
+            n_neuro = len(result.get("neuromorphic_comparisons", []))
             results_summary["phase2"] = {
                 "status": "completed",
                 "overall_pass": result.get("overall_pass"),
+                "includes_neuromorphic": n_neuro > 0,
+                "neuromorphic_metrics_validated": n_neuro,
                 "time_s": phase_times["phase2"],
             }
         except Exception as e:
@@ -275,6 +288,28 @@ def main() -> int:
         print("\n  Phase 6: SKIPPED")
         results_summary["phase6"] = {"status": "skipped"}
 
+    # --- Interpretation ---
+    results_dir = RESULTS_BASE / run_name
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    print("\n" + "=" * 70)
+    print("  INTERPRETATION — Pass/Fail Verdicts")
+    print("=" * 70)
+    try:
+        from pvp.interpret_results import interpret_all
+
+        t0 = time.perf_counter()
+        interp = interpret_all(results_dir, run_name=run_name)
+        phase_times["interpretation"] = time.perf_counter() - t0
+        results_summary["interpretation"] = {
+            "status": "completed",
+            "time_s": phase_times["interpretation"],
+        }
+    except Exception as e:
+        print(f"  Interpretation FAILED: {e}")
+        traceback.print_exc()
+        results_summary["interpretation"] = {"status": "failed", "error": str(e)}
+
     # --- Summary ---
     total_time = time.perf_counter() - total_start
     results_summary["total_time_s"] = total_time  # type: ignore[assignment]
@@ -286,6 +321,7 @@ def main() -> int:
     summary_lines: list[str] = [
         "PVP — Pipeline Verification Procedure Summary",
         f"Run: {run_name}",
+        f"Neuromorphic evaluation: included (Phase 0 baselines + Phase 2 validation)",
         f"Total time: {total_time:.1f} s ({total_time / 60:.1f} min)",
         "",
         f"{'Phase':<30s} {'Status':<12s} {'Pass':>6s} {'Time':>10s}",
@@ -306,8 +342,6 @@ def main() -> int:
     summary_lines.append("-" * 60)
     summary_lines.append(f"  Total: {total_time:.1f} s")
 
-    results_dir = RESULTS_BASE / run_name
-    results_dir.mkdir(parents=True, exist_ok=True)
     save_json(results_summary, results_dir / "pvp_summary.json")
     save_text_report(summary_lines, results_dir / "pvp_summary.txt")
 
