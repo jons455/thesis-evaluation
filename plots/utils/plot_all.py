@@ -68,6 +68,15 @@ def generate_all_plots(
         print(f"  Phase 6 data: {phase6_dir_override}")
     print("=" * 70)
 
+    # Phase 0
+    if 0 not in skip:
+        phase0_dir = results_base / "phase0_ground_truth"
+        if phase0_dir.exists():
+            from plots.utils.plot_phase0 import generate_phase0_plots
+            generate_phase0_plots(phase0_dir, plots_root / "phase0")
+        else:
+            print(f"  [skip] {phase0_dir.name}/ not found")
+
     # Phase 1
     if 1 not in skip:
         phase1_dir = results_base / "phase1_correctness"
@@ -181,7 +190,7 @@ def main() -> int:
 
     only_phases = set(args.only) if args.only else None
     if only_phases:
-        skip = set(range(1, 7)) - only_phases
+        skip = set(range(0, 7)) - only_phases
     else:
         skip = set(args.skip)
 

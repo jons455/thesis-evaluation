@@ -630,7 +630,7 @@ Reference from `notebooks/train_snn_v12.py` (V12Config). Other probe models (v9,
 | Input size | 13 (refs, prev voltage, EMAs; no derivatives) |
 | Output size | 2 (delta u_d, delta u_q) |
 
-Sampling stride and windowing: see training data generation and dataset in `evaluation/pytorch_snn/utils/dataset.py` and training scripts.
+Sampling stride and windowing: see training data generation and dataset in `evaluation/pytorch_snn/utils/dataset.py` and training scripts. This windowing procedure yields approximately 19,500 training sequences across the 500 trajectories (each 2000-step trajectory with window size 100 and stride 50 gives (2000−100)/50+1 = 39 windows, so 500×39 = 19,500).
 """
     (out_dir / "appendix_F_motor_and_training_config.md").write_text(motor_table, encoding="utf-8")
     print(f"  Wrote {out_dir / 'appendix_F_motor_and_training_config.md'}")

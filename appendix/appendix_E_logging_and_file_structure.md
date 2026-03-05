@@ -7,7 +7,8 @@
 | R1, R2 | Full trajectory (t, i_q_ref, i_q, u_q) |
 | R3, R4, R5 | Full trajectory |
 | R12 | Full trajectory |
-| R0a–R0c, R6–R11, R13, R14 (opt) | Metrics only (MAE, ITAE, settling time, overshoot, SyOps, sparsity) |
+| R0a–R0c | Metrics (MAE) + neuromorphic baselines (SyOps/step, mean sparsity, spikes/step) |
+| R6–R11, R13, R14 (opt) | Metrics only (MAE, ITAE, settling time, overshoot, SyOps, sparsity) |
 
 After every run and every scenario: GEM environment, controller state, SNN hidden/membrane state, and metric accumulators are fully reset.
 
@@ -16,7 +17,9 @@ After every run and every scenario: GEM environment, controller state, SNN hidde
 | Pattern | Meaning |
 | --- | --- |
 | `phase0_ground_truth/phase0_rankings.json` | MAE_q per model per scenario (Phase 0) |
+| `phase0_ground_truth/phase0_neuromorphic.json` | Neuromorphic baselines: SyOps/step, mean sparsity, spikes/step per model per scenario (Phase 0, wrapper-free) |
 | `phase0_ground_truth/phase0_report.txt` | Human-readable Phase 0 report |
+| `phase2_metric_validation/phase2_validation.json` | Control + neuromorphic metric deviations (manual vs pipeline); includes `neuromorphic_comparisons` array |
 | `phase3_discriminative/trajectory_<model>_<scenario>.json` | Trajectory (t, i_q_ref, i_q, u_q) for one agent and one scenario |
 | `phase3_discriminative/R2_PI_baseline.json`, `R3_*.json`, … | Full metrics per scenario for that run |
 | `phase3_discriminative/phase3_summaries.json` | All agents’ scenario results combined |
