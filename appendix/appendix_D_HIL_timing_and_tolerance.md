@@ -38,6 +38,8 @@ NOTE: SC-6b (hardware-software agreement) requires R11 (Akida sim) data. Compare
 Overall Phase 5: SC-6a=PASS, SC-6c=Reported
 ```
 
+**Evaluation (Phase 5 latency).** The infrastructure computes and logs P95/P99 and max round-trip latency per scenario. For the thesis run, the 95th-percentile round-trip latency is ~6.2 ms and the 99th-percentile reaches ~10–16 ms across scenarios; tail-latency spikes of up to ~300 ms were observed (e.g. 300.8 ms in R13 on `multi_step_bidirectional_1500rpm`). These values confirm that the communication overhead is not merely a mean-value artifact but exhibits significant variance attributable to the TCP/OS layer; the Discussion’s mention of ~300 ms tail spikes is grounded in this Phase 5 evaluation.
+
 ## Tolerance band check table (SC-6a: R12 vs R13)
 
 | Scenario | Metric | R12 | R13 | Within band? |

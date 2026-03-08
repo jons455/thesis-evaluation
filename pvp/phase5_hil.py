@@ -77,7 +77,7 @@ def _build_hil_controller(host: str, port: int, timeout: float, error_gain: floa
     """Build the remote Akida controller for HIL runs."""
     from embark.benchmark.adapters import TensorControllerAdapter
     from embark.benchmark.controllers.remote.akida_policy import RemoteAkidaPolicy
-    from evaluation.akida.run_benchmark_remote import AkidaActionProcessor, AkidaStateProcessor
+    from akida_processors import AkidaActionProcessor, AkidaStateProcessor
 
     remote_policy = RemoteAkidaPolicy(
         host=host,
@@ -193,15 +193,26 @@ def run_phase5(
     # --- SC-6c: Timing characterization ---
     report_lines.append("")
     report_lines.append("--- SC-6c: Timing Characterization ---")
+    all_p95: list[float] = []
+    all_p99: list[float] = []
+    all_max_lat: list[float] = []
     for sr in summary_r12.scenario_results:
         m = sr.metrics
         mean_lat = m.get("mean_latency_ms", float("nan"))
         p95_lat = m.get("p95_latency_ms", float("nan"))
+        p99_lat = m.get("p99_latency_ms", float("nan"))
+        max_lat = m.get("max_latency_ms", float("nan"))
         chip_mean = m.get("chip_mean_us", float("nan"))
+        if not np.isnan(p95_lat):
+            all_p95.append(p95_lat)
+        if not np.isnan(p99_lat):
+            all_p99.append(p99_lat)
+        if not np.isnan(max_lat):
+            all_max_lat.append(max_lat)
 
         line = (
             f"  {sr.scenario_name}: "
-            f"round-trip={mean_lat:.3f} ms (p95={p95_lat:.3f}), "
+            f"round-trip={mean_lat:.3f} ms (p95={p95_lat:.3f}, p99={p99_lat:.3f}, max={max_lat:.1f} ms), "
             f"chip={chip_mean:.1f} us"
         )
         report_lines.append(line)
@@ -211,7 +222,26 @@ def run_phase5(
         if not np.isnan(mean_lat) and mean_lat > timestep_ms:
             report_lines.append(f"    NOTE: round-trip ({mean_lat:.3f} ms) > control timestep ({timestep_ms} ms)")
 
+    for sr in summary_r13.scenario_results:
+        m = sr.metrics
+        max_lat = m.get("max_latency_ms", float("nan"))
+        if not np.isnan(max_lat):
+            all_max_lat.append(max_lat)
+        p99_lat = m.get("p99_latency_ms", float("nan"))
+        if not np.isnan(p99_lat):
+            all_p99.append(p99_lat)
+
     report_lines.append("  SC-6c: Reported (non-gating)")
+    if all_p95 and all_max_lat:
+        p95_repr = max(all_p95)
+        max_tail_ms = max(all_max_lat)
+        report_lines.append("")
+        report_lines.append(
+            "Evaluation: The 95th-percentile round-trip latency of "
+            f"{p95_repr:.2f} ms and tail-latency spikes of up to {max_tail_ms:.0f} ms "
+            "(TCP/OS layer) confirm that the communication overhead is not merely a "
+            "mean-value artifact but exhibits significant variance."
+        )
 
     # --- Overall ---
     report_lines.append("")

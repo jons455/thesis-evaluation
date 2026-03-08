@@ -1,7 +1,7 @@
 """
 Run BenchmarkSuite with TD-HIL: remote Akida board as controller.
 
-Uses the same evaluation/akida/server inference server on the board. The PC runs
+Uses the same inference server on the board (see AKIDA_BOARD_DEPLOY.md). The PC runs
 the BenchmarkSuite (STANDARD_SCENARIOS or QUICK_SCENARIOS) and sends observations
 to the board over TCP; the board runs the .fbz model and returns actions (time-dilated
 HIL: simulation waits for each inference, so control quality is independent of latency).
@@ -24,10 +24,12 @@ import sys
 import time
 from pathlib import Path
 
-# Repo root on path for evaluation.* and embark
+# Repo root and embark-evaluation on path (embark-evaluation is self-contained; no evaluation package)
 _repo_root = Path(__file__).resolve().parents[1]
-if str(_repo_root) not in sys.path:
-    sys.path.insert(0, str(_repo_root))
+_embark_eval_dir = Path(__file__).resolve().parent
+for _p in [str(_repo_root), str(_embark_eval_dir)]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 
 def parse_args() -> argparse.Namespace:
@@ -119,7 +121,7 @@ def _build_remote_akida_controller(args: argparse.Namespace):
     """Build TensorControllerAdapter with RemoteAkidaPolicy and Akida state/action processors."""
     from embark.benchmark.adapters import TensorControllerAdapter
     from embark.benchmark.controllers.remote.akida_policy import RemoteAkidaPolicy
-    from evaluation.akida.run_benchmark_remote import (
+    from akida_processors import (
         AkidaActionProcessor,
         AkidaStateProcessor,
     )

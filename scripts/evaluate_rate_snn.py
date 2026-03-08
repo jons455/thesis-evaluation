@@ -3,8 +3,7 @@ Evaluate FeedForwardRate SNN models (v8/v9/v12) against PI baseline.
 
 Canonical copy for embark-evaluation: wrapper-free evaluation used by PVP Phase 0
 and for ad-hoc model checks. Feature builders match the training pipeline.
-Uses benchmark rate-SNN state/action processors when evaluation.rate_interface
-is available (same semantics as the harness).
+Uses scripts/rate_interface.py (embark only; no dependency on evaluation package).
 
 Run from repo root:
     poetry run python embark-evaluation/scripts/evaluate_rate_snn.py --quick
@@ -47,9 +46,9 @@ from embark.benchmark.tasks.pmsm_current_control import (  # noqa: E402
 # Local fallback for trained-models path (embark.utils.paths was removed in embark)
 TRAINED_MODELS_DIR = _project_root / "evaluation" / "trained_models"
 
-# Use benchmark rate-SNN state/action processors when available (same interface as harness)
+# Use local rate_interface (embark-evaluation self-contained; no evaluation package)
 try:
-    from evaluation.rate_interface import (
+    from rate_interface import (
         RATE_INTERFACE_AVAILABLE,
         get_action_processor_absolute,
         get_action_processor_incremental,
